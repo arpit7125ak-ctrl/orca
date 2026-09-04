@@ -1,7 +1,28 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
+async function requestJson(url, options = {}) {
+  const response = await fetch(url, options)
+
+  let result = null
+  try {
+    result = await response.json()
+  } catch {
+    result = null
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      result?.message ||
+      result?.error?.message ||
+      `Request failed: ${response.status}`
+    )
+  }
+
+  return result
+}
+
 export async function runAnalysis(latitude, longitude) {
-  const response = await fetch(`${API_BASE_URL}/api/v1/analysis`, {
+  const result = await requestJson(`${API_BASE_URL}/api/v1/analysis`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -20,11 +41,13 @@ export async function runAnalysis(latitude, longitude) {
     }),
   })
 
-  const result = await response.json()
+  return result?.data || result
+}
 
-  if (!response.ok) {
-    throw new Error(result.message || `Analysis request failed: ${response.status}`)
-  }
+export async function getAnalysis(analysisId) {
+  const result = await requestJson(
+    `${API_BASE_URL}/api/v1/analysis/${encodeURIComponent(analysisId)}`
+  )
 
-  return result.data
+  return result?.data || result
 }

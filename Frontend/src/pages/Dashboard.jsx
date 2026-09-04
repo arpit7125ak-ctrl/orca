@@ -36,13 +36,13 @@ function Dashboard({ zone, data, loading, error }) {
 
           <p className="mt-2 text-slate-400">
             {loading
-              ? 'Processing marine conditions and environmental intelligence...'
+              ? 'Processing marine conditions...'
               : 'Monitor marine conditions, ecosystem health and risk.'}
           </p>
 
           {error && (
             <p className="mt-2 text-sm text-orange-400">
-              Some analysis data is currently unavailable.
+              Some analysis data is unavailable.
             </p>
           )}
         </div>
@@ -60,12 +60,12 @@ function Dashboard({ zone, data, loading, error }) {
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <AgentStatus data={data?.zones?.[0]} />
-          <DecisionPanel data={data?.decision} />    
+          <AgentStatus data={data} loading={loading} />
+          <DecisionPanel data={data} loading={loading} />
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <AnalysisPanel data={data} />
+          <AnalysisPanel data={data} loading={loading} />
           <ChatBox />
         </div>
 

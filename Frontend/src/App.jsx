@@ -29,14 +29,18 @@ function App() {
 
   return (
     <div className="min-h-screen text-[#E9E2CC]">
-      <Navbar />
+      <Navbar page={page} setPage={setPage} />
 
       {page === 'landing' && (
         <Landing onEnter={() => setPage('analysis')} />
       )}
 
       {page === 'analysis' && (
-        <Analysis onAnalyze={handleAnalyze} />
+        <Analysis
+          onAnalyze={handleAnalyze}
+          loading={loading}
+          error={error}
+        />
       )}
 
       {page === 'dashboard' && (

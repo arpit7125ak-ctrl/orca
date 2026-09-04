@@ -1,65 +1,48 @@
 function DecisionPanel({ data }) {
-  const decision = data || {}
+  const decision = data?.decision || data?.overallDecision || null
 
   return (
-    <div className="rounded-2xl border border-cyan-500/20 bg-[#111116] p-6">
-      <p className="text-sm uppercase tracking-widest text-cyan-400">
+    <div className="rounded-2xl border border-purple-900/40 bg-[#020817] p-7">
+      <p className="text-sm uppercase tracking-widest text-purple-400">
         Decision Intelligence
       </p>
 
-      <h2 className="mt-2 text-2xl font-bold">
-        Overall Decision
+      <h2 className="mt-3 text-3xl font-bold">
+        Recommended Decision
       </h2>
 
-      <div className="mt-8">
-        <p className="text-3xl font-bold">
-          {decision.recommendation ?? '--'}
-        </p>
-
-        <div className="mt-6">
-          <p className="text-sm text-slate-500">
-            Key Reasons
+      {decision ? (
+        <>
+          <p className="mt-6 text-2xl font-semibold text-cyan-400">
+            {decision.recommendation || '--'}
           </p>
 
-          {decision.key_reasons?.length ? (
-            <ul className="mt-3 space-y-2">
-              {decision.key_reasons.map((reason, index) => (
-                <li key={index} className="text-slate-300">
-                  • {reason}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-3 text-slate-500">--</p>
+          {decision.key_reasons?.length > 0 && (
+            <div className="mt-5">
+              <p className="text-slate-400">Key Reasons</p>
+
+              <ul className="mt-3 space-y-2">
+                {decision.key_reasons.map((reason, index) => (
+                  <li key={index} className="text-slate-200">
+                    • {reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
-        </div>
 
-        <div className="mt-6">
-          <p className="text-sm text-slate-500">
-            Confidence
-          </p>
-
-          <p className="mt-2 text-2xl font-bold">
-            {decision.confidence ?? '--'}
-          </p>
-        </div>
-
-        {decision.limitations?.length > 0 && (
           <div className="mt-6">
-            <p className="text-sm text-slate-500">
-              Limitations
+            <p className="text-slate-400">Confidence</p>
+            <p className="mt-1 text-xl">
+              {decision.confidence ?? '--'}
             </p>
-
-            <ul className="mt-3 space-y-2">
-              {decision.limitations.map((item, index) => (
-                <li key={index} className="text-sm text-orange-300">
-                  • {item}
-                </li>
-              ))}
-            </ul>
           </div>
-        )}
-      </div>
+        </>
+      ) : (
+        <p className="mt-6 text-slate-400">
+          Decision will appear when AI analysis is available.
+        </p>
+      )}
     </div>
   )
 }

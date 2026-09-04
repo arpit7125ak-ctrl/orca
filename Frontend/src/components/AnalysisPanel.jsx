@@ -1,5 +1,5 @@
 function AnalysisPanel({ data }) {
-  const decision = data?.overallDecision
+  const decision = data?.decision || data?.overallDecision || null
 
   return (
     <div className="rounded-2xl border border-slate-700 bg-[#111116] p-6">
@@ -22,7 +22,7 @@ function AnalysisPanel({ data }) {
           </p>
 
           <p className="mt-2 text-xl font-bold">
-            {data?.dataQuality ?? '--'}
+            {Array.isArray(data?.dataQuality) ? data.dataQuality.join(', ') || '--' : data?.dataQuality ?? data?.data_quality ?? '--'}
           </p>
         </div>
 

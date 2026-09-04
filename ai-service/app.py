@@ -1,4 +1,5 @@
 from typing import Any, Dict
+import traceback
 
 from fastapi import FastAPI, HTTPException
 from pydantic import ValidationError
@@ -16,9 +17,6 @@ app = FastAPI(
 
 @app.get("/health")
 def health_check() -> Dict[str, Any]:
-    """
-    Health check endpoint.
-    """
     return {
         "status": "ok",
         "service": "ORCA AI-Service",
@@ -29,17 +27,6 @@ def health_check() -> Dict[str, Any]:
 def analyze(request: AnalysisRequest) -> AnalysisResponse:
     """
     Run the complete ORCA marine intelligence workflow.
-
-    Flow:
-        Weather
-          ↓
-        Ocean
-          ↓
-        Ecosystem
-          ↓
-        Risk
-          ↓
-        Decision
     """
 
     try:
@@ -59,9 +46,10 @@ def analyze(request: AnalysisRequest) -> AnalysisResponse:
                 request.analysisId,
             ),
             "success": result.get("success", False),
-"zones": list(
-    result.get("zone_results", {}).values()
-),            "decision": result.get("decision"),
+            "zones": list(
+                result.get("zone_results", {}).values()
+            ),
+            "decision": result.get("decision"),
             "errors": result.get("errors", []),
             "data_quality": [],
         }
@@ -70,10 +58,15 @@ def analyze(request: AnalysisRequest) -> AnalysisResponse:
             return AnalysisResponse.model_validate(response_data)
 
         except ValidationError as exc:
+            traceback.print_exc()
+
             raise HTTPException(
                 status_code=500,
                 detail={
-                    "message": "AI workflow produced a response that failed schema validation.",
+                    "message": (
+                        "AI workflow produced a response "
+                        "that failed schema validation."
+                    ),
                     "errors": exc.errors(),
                 },
             ) from exc
@@ -82,6 +75,8 @@ def analyze(request: AnalysisRequest) -> AnalysisResponse:
         raise
 
     except Exception as exc:
+        traceback.print_exc()
+
         raise HTTPException(
             status_code=500,
             detail={
@@ -93,9 +88,6 @@ def analyze(request: AnalysisRequest) -> AnalysisResponse:
 
 @app.get("/")
 def root() -> Dict[str, str]:
-    """
-    Basic service information.
-    """
     return {
         "service": "ORCA AI-Service",
         "status": "running",
