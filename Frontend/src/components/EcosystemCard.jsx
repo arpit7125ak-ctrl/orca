@@ -1,72 +1,63 @@
 function EcosystemCard({ data }) {
   const ecosystem = data || {}
 
-  return (
-    <div className="rounded-2xl border border-emerald-400/10 bg-[#111116] p-5 shadow-xl shadow-black/20">
+  const healthScore =
+    typeof ecosystem.health_score === 'number'
+      ? ecosystem.health_score
+      : 0
 
-      <div className="mb-5 flex items-start justify-between">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-400/70">
-            Marine Biology
+  return (
+    <div className="rounded-2xl border border-emerald-500/20 bg-[#111116] p-6">
+      <p className="text-sm uppercase tracking-widest text-emerald-400">
+        Marine Biology
+      </p>
+
+      <h2 className="mt-2 text-2xl font-bold">
+        Ecosystem Health
+      </h2>
+
+      <div className="mt-8">
+
+        <div className="flex justify-between">
+          <p className="text-sm text-slate-500">
+            Overall Health
           </p>
 
-          <h2 className="mt-1 text-lg font-semibold text-white">
-            Ecosystem Health
-          </h2>
+          <p className="font-bold">
+            {ecosystem.overall_health ?? '--'}
+          </p>
         </div>
 
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-400/10 text-emerald-300">
-          ◌
-        </div>
-      </div>
-
-      <div className="space-y-5">
-
-        <div>
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-500">
-              Overall Health
-            </p>
-
-            <p className="text-sm font-semibold text-emerald-300">
-              {ecosystem.overall_health ?? '--'}
-            </p>
-          </div>
-
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/5">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-300 transition-all"
-              style={{
-                width: `${ecosystem.health_score ?? 0}%`,
-              }}
-            />
-          </div>
+        <div className="mt-4 h-2 rounded-full bg-slate-800">
+          <div
+            className="h-2 rounded-full bg-emerald-400"
+            style={{ width: `${healthScore}%` }}
+          />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="mt-6 grid grid-cols-2 gap-4">
 
-          <div className="rounded-xl border border-emerald-400/10 bg-emerald-400/[0.03] p-4">
-            <p className="text-xs text-slate-500">
+          <div className="rounded-xl border border-emerald-500/20 p-5">
+            <p className="text-sm text-slate-500">
               Biodiversity
             </p>
 
-            <p className="mt-2 text-xl font-semibold text-emerald-100">
+            <p className="mt-2 text-2xl font-bold">
               {ecosystem.biodiversity ?? '--'}
             </p>
           </div>
 
-          <div className="rounded-xl border border-emerald-400/10 bg-emerald-400/[0.03] p-4">
-            <p className="text-xs text-slate-500">
+          <div className="rounded-xl border border-emerald-500/20 p-5">
+            <p className="text-sm text-slate-500">
               Productivity
             </p>
 
-            <p className="mt-2 text-xl font-semibold text-emerald-100">
+            <p className="mt-2 text-2xl font-bold">
               {ecosystem.productivity ?? '--'}
             </p>
           </div>
 
         </div>
-
       </div>
     </div>
   )

@@ -1,58 +1,41 @@
-function AnalysisPanel() {
+function AnalysisPanel({ data }) {
+  const decision = data?.overallDecision
+
   return (
-    <div className="rounded-2xl border border-violet-400/10 bg-[#111116] p-5 shadow-xl shadow-black/20">
+    <div className="rounded-2xl border border-slate-700 bg-[#111116] p-6">
+      <p className="text-sm uppercase tracking-widest text-cyan-400">
+        Analysis
+      </p>
 
-      <div className="mb-5 flex items-start justify-between">
+      <h2 className="mt-2 text-2xl font-bold">
+        Intelligence Assessment
+      </h2>
+
+      <p className="mt-6 text-slate-400">
+        {decision?.recommendation ?? '--'}
+      </p>
+
+      <div className="mt-8 grid grid-cols-2 gap-6">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-400/70">
-            Intelligence
-          </p>
-
-          <h2 className="mt-1 text-lg font-semibold text-white">
-            Environmental Analysis
-          </h2>
-        </div>
-
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-400/10 text-violet-300">
-          ◇
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-violet-400/10 bg-violet-400/[0.02] p-5">
-        <p className="text-[10px] uppercase tracking-[0.2em] text-slate-600">
-          Current Assessment
-        </p>
-
-        <p className="mt-3 text-sm leading-6 text-slate-400">
-          Environmental analysis will appear here after ORCA processes
-          the selected marine zone.
-        </p>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-3">
-
-        <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-          <p className="text-[10px] uppercase tracking-wider text-slate-600">
+          <p className="text-sm text-slate-500">
             Data Quality
           </p>
 
-          <p className="mt-2 text-2xl font-semibold text-violet-200">
-            --
+          <p className="mt-2 text-xl font-bold">
+            {data?.dataQuality ?? '--'}
           </p>
         </div>
 
-        <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-          <p className="text-[10px] uppercase tracking-wider text-slate-600">
+        <div>
+          <p className="text-sm text-slate-500">
             Confidence
           </p>
 
-          <p className="mt-2 text-2xl font-semibold text-violet-200">
-            --
+          <p className="mt-2 text-xl font-bold">
+            {decision?.confidence ?? '--'}
           </p>
         </div>
-
       </div>
-
     </div>
   )
 }

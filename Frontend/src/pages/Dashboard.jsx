@@ -9,7 +9,9 @@ import DecisionPanel from '../components/DecisionPanel.jsx'
 import AnalysisPanel from '../components/AnalysisPanel.jsx'
 import ChatBox from '../components/ChatBox.jsx'
 
-function Dashboard({ zone }) {
+function Dashboard({ zone, data, loading, error }) {
+  const backendZone = data?.zones?.[0] || {}
+
   return (
     <div className="flex">
       <Sidebar />
@@ -27,34 +29,43 @@ function Dashboard({ zone }) {
 
           {zone && (
             <p className="mt-2 text-sm text-cyan-400">
-              Analysis Zone: {zone.latitude.toFixed(4)}° N, {zone.longitude.toFixed(4)}° E
+              Analysis Zone: {zone.latitude.toFixed(4)}° N,{' '}
+              {zone.longitude.toFixed(4)}° E
             </p>
           )}
 
           <p className="mt-2 text-slate-400">
-            Monitor marine conditions, ecosystem health and risk.
+            {loading
+              ? 'Processing marine conditions and environmental intelligence...'
+              : 'Monitor marine conditions, ecosystem health and risk.'}
           </p>
+
+          {error && (
+            <p className="mt-2 text-sm text-orange-400">
+              Some analysis data is currently unavailable.
+            </p>
+          )}
         </div>
 
-      <MapView zone={zone} />
+        <MapView zone={zone} />
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <WeatherCard />
-          <OceanCard />
-        </div>
-
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <EcosystemCard />
-          <RiskCard />
-        </div>
-
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <AgentStatus />
-          <DecisionPanel />
+          <WeatherCard data={backendZone.weather} />
+          <OceanCard data={backendZone.ocean} />
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <AnalysisPanel />
+          <EcosystemCard data={backendZone.ecosystem} />
+          <RiskCard data={backendZone.risk} />
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <AgentStatus data={data?.zones?.[0]} />
+          <DecisionPanel data={data?.decision} />    
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <AnalysisPanel data={data} />
           <ChatBox />
         </div>
 

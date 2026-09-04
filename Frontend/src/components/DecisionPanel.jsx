@@ -1,52 +1,65 @@
-function DecisionPanel() {
+function DecisionPanel({ data }) {
+  const decision = data || {}
+
   return (
-    <div className="rounded-2xl border border-amber-400/10 bg-[#111116] p-5 shadow-xl shadow-black/20">
+    <div className="rounded-2xl border border-cyan-500/20 bg-[#111116] p-6">
+      <p className="text-sm uppercase tracking-widest text-cyan-400">
+        Decision Intelligence
+      </p>
 
-      <div className="mb-5 flex items-start justify-between">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-400/70">
-            Intelligence Output
+      <h2 className="mt-2 text-2xl font-bold">
+        Overall Decision
+      </h2>
+
+      <div className="mt-8">
+        <p className="text-3xl font-bold">
+          {decision.recommendation ?? '--'}
+        </p>
+
+        <div className="mt-6">
+          <p className="text-sm text-slate-500">
+            Key Reasons
           </p>
 
-          <h2 className="mt-1 text-lg font-semibold text-white">
-            Final Decision
-          </h2>
+          {decision.key_reasons?.length ? (
+            <ul className="mt-3 space-y-2">
+              {decision.key_reasons.map((reason, index) => (
+                <li key={index} className="text-slate-300">
+                  • {reason}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-slate-500">--</p>
+          )}
         </div>
 
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-400/10 text-amber-300">
-          ✦
+        <div className="mt-6">
+          <p className="text-sm text-slate-500">
+            Confidence
+          </p>
+
+          <p className="mt-2 text-2xl font-bold">
+            {decision.confidence ?? '--'}
+          </p>
         </div>
-      </div>
 
-      <div className="relative overflow-hidden rounded-xl border border-amber-400/10 bg-gradient-to-br from-amber-400/[0.06] to-transparent p-6">
+        {decision.limitations?.length > 0 && (
+          <div className="mt-6">
+            <p className="text-sm text-slate-500">
+              Limitations
+            </p>
 
-        <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-amber-400/5 blur-3xl" />
-
-        <div className="relative">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-600">
-            Recommendation
-          </p>
-
-          <p className="mt-3 text-2xl font-bold text-amber-100">
-            Awaiting Analysis
-          </p>
-
-          <p className="mt-3 max-w-md text-sm leading-6 text-slate-500">
-            The collaborative agents will generate a recommendation
-            after environmental and ecosystem data are analyzed.
-          </p>
-
-          <div className="mt-6 flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-slate-600" />
-
-            <span className="text-xs text-slate-600">
-              Decision engine idle
-            </span>
+            <ul className="mt-3 space-y-2">
+              {decision.limitations.map((item, index) => (
+                <li key={index} className="text-sm text-orange-300">
+                  • {item}
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
-
+        )}
       </div>
-
     </div>
   )
 }
