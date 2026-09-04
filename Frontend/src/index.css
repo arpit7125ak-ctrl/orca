@@ -1,0 +1,765 @@
+@import "tailwindcss";
+
+/* =========================================================
+   ORCA — CHART PLATE DESIGN SYSTEM
+   Dark nautical instrument interface
+   ========================================================= */
+
+:root {
+  /* -------------------------------------------------------
+     CORE CHART PALETTE
+     ------------------------------------------------------- */
+
+  --chart-navy: #0B2545;
+  --sounding-blue: #1B4965;
+  --chart-buff: #E9E2CC;
+  --ink: #10151B;
+
+  --starboard-green: #1E7A4C;
+  --caution-amber: #D68C24;
+  --port-red: #C7362F;
+
+  /* -------------------------------------------------------
+     APPLICATION SURFACES
+     ------------------------------------------------------- */
+
+  --app-background: #07131F;
+  --app-background-deep: #050D15;
+
+  --surface-primary: #0B2545;
+  --surface-secondary: #1B4965;
+  --surface-light: #E9E2CC;
+
+  /* -------------------------------------------------------
+     SEMANTIC STATUS
+     ------------------------------------------------------- */
+
+  --verdict-safe: #1E7A4C;
+  --verdict-caution: #D68C24;
+  --verdict-danger: #C7362F;
+
+  --status-live: #1E7A4C;
+  --status-cached: #D68C24;
+  --status-unmapped: #10151B;
+
+  /* -------------------------------------------------------
+     TEXT
+     ------------------------------------------------------- */
+
+  --text-primary: #E9E2CC;
+  --text-dark: #10151B;
+
+  --text-secondary: rgba(233, 226, 204, 0.78);
+  --text-muted: rgba(233, 226, 204, 0.58);
+  --text-faint: rgba(233, 226, 204, 0.38);
+
+  /* -------------------------------------------------------
+     BORDERS / CHART LINES
+     ------------------------------------------------------- */
+
+  --border-chart: rgba(233, 226, 204, 0.28);
+  --border-chart-strong: rgba(233, 226, 204, 0.45);
+  --border-dark: rgba(16, 21, 27, 0.45);
+
+  --chart-line: rgba(233, 226, 204, 0.055);
+  --chart-line-strong: rgba(233, 226, 204, 0.09);
+
+  /* -------------------------------------------------------
+     HATCHING
+     ------------------------------------------------------- */
+
+  --hatch-ink: rgba(16, 21, 27, 0.15);
+
+  /* -------------------------------------------------------
+     TYPOGRAPHY
+     ------------------------------------------------------- */
+
+  font-family:
+    "IBM Plex Sans",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+
+  color: var(--text-primary);
+  background: var(--app-background);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+
+/* =========================================================
+   RESET
+   ========================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+html {
+  background: var(--app-background-deep);
+}
+
+body {
+  min-height: 100vh;
+  color: var(--text-primary);
+
+  /*
+    Dark nautical chart background.
+    Very subtle grid lines prevent the flat "cheap blue"
+    appearance without becoming decorative.
+  */
+  background:
+    linear-gradient(
+      90deg,
+      var(--chart-line) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      0deg,
+      var(--chart-line) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      180deg,
+      #07131F 0%,
+      #081522 48%,
+      #050D15 100%
+    );
+
+  background-size:
+    48px 48px,
+    48px 48px,
+    100% 100%;
+
+  background-attachment: fixed;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+
+/* =========================================================
+   SELECTION
+   ========================================================= */
+
+::selection {
+  background: var(--chart-buff);
+  color: var(--ink);
+}
+
+
+/* =========================================================
+   FORM CONTROLS
+   ========================================================= */
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--caution-amber);
+  outline-offset: 3px;
+}
+
+
+/* =========================================================
+   TYPOGRAPHY
+   ========================================================= */
+
+.instrument-number {
+  font-family:
+    "IBM Plex Mono",
+    "SFMono-Regular",
+    Consolas,
+    monospace;
+
+  letter-spacing: 0.02em;
+}
+
+.page-title {
+  font-family:
+    "Fraunces",
+    Georgia,
+    serif;
+
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.verdict-word {
+  font-family:
+    "Fraunces",
+    Georgia,
+    serif;
+
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+
+/* =========================================================
+   CHART PLATES
+   ========================================================= */
+
+.chart-plate {
+  position: relative;
+
+  border: 1px solid var(--border-chart);
+  border-radius: 2px;
+
+  background: var(--surface-secondary);
+}
+
+/*
+  Slightly darker plate.
+*/
+
+.chart-plate-dark {
+  position: relative;
+
+  border: 1px solid var(--border-chart);
+  border-radius: 2px;
+
+  background: var(--surface-primary);
+}
+
+
+/*
+  Light chart-paper plate.
+*/
+
+.chart-plate-light {
+  position: relative;
+
+  border: 1px solid var(--border-dark);
+  border-radius: 2px;
+
+  background: var(--surface-light);
+  color: var(--text-dark);
+}
+
+
+/* =========================================================
+   CORNER TICKS
+   Admiralty-style chart plate registration marks.
+   ========================================================= */
+
+.chart-corners::before,
+.chart-corners::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+
+  pointer-events: none;
+}
+
+.chart-corners::before {
+  top: -1px;
+  left: -1px;
+
+  border-top: 1px solid var(--chart-buff);
+  border-left: 1px solid var(--chart-buff);
+}
+
+.chart-corners::after {
+  right: -1px;
+  bottom: -1px;
+
+  border-right: 1px solid var(--chart-buff);
+  border-bottom: 1px solid var(--chart-buff);
+}
+
+
+/* =========================================================
+   CHART DIVIDERS
+   ========================================================= */
+
+.chart-divider {
+  height: 1px;
+  width: 100%;
+
+  background: var(--border-chart);
+}
+
+.chart-divider-dark {
+  height: 1px;
+  width: 100%;
+
+  background: var(--border-dark);
+}
+
+
+/* =========================================================
+   NAUTICAL HATCH
+   For NOT_MAPPED / UNAVAILABLE.
+   ========================================================= */
+
+.hatch {
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 7px,
+      var(--hatch-ink) 7px,
+      var(--hatch-ink) 8px
+    );
+}
+
+
+/*
+  Dark-background hatch.
+*/
+
+.hatch-dark {
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 7px,
+      rgba(233, 226, 204, 0.09) 7px,
+      rgba(233, 226, 204, 0.09) 8px
+    );
+}
+
+
+/* =========================================================
+   STATUS DOTS
+   ========================================================= */
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+
+  flex: 0 0 7px;
+
+  border-radius: 50%;
+}
+
+.status-dot-live {
+  background: var(--status-live);
+}
+
+.status-dot-cached {
+  background: var(--status-cached);
+}
+
+
+/*
+  NOT_MAPPED uses hatch instead of a status dot.
+*/
+
+.status-unmapped {
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 4px,
+      var(--hatch-ink) 4px,
+      var(--hatch-ink) 5px
+    );
+}
+
+
+/* =========================================================
+   VERDICT COLORS
+   ========================================================= */
+
+.verdict-safe {
+  color: var(--verdict-safe);
+}
+
+.verdict-caution {
+  color: var(--verdict-caution);
+}
+
+.verdict-danger {
+  color: var(--verdict-danger);
+}
+
+
+/* =========================================================
+   VERDICT PLATES
+   ========================================================= */
+
+.verdict-safe-plate {
+  border-left: 3px solid var(--verdict-safe);
+}
+
+.verdict-caution-plate {
+  border-left: 3px solid var(--verdict-caution);
+}
+
+.verdict-danger-plate {
+  border-left: 3px solid var(--verdict-danger);
+}
+
+
+/* =========================================================
+   INSTRUMENT READING
+   ========================================================= */
+
+.instrument-reading {
+  font-family:
+    "IBM Plex Mono",
+    "SFMono-Regular",
+    Consolas,
+    monospace;
+
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+
+/* =========================================================
+   COMPASS GRID
+   ========================================================= */
+
+.compass-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+
+  border: 1px solid var(--border-chart);
+
+  background: var(--border-chart);
+}
+
+.compass-cell {
+  min-height: 90px;
+
+  border: 0;
+
+  background: var(--app-background);
+}
+
+
+/* =========================================================
+   NAUTICAL GRID LINES
+   ========================================================= */
+
+.nautical-grid {
+  background-image:
+    linear-gradient(
+      90deg,
+      var(--chart-line) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      0deg,
+      var(--chart-line) 1px,
+      transparent 1px
+    );
+
+  background-size: 32px 32px;
+}
+
+
+/* =========================================================
+   MAP FRAME
+   ========================================================= */
+
+.map-frame {
+  position: relative;
+
+  overflow: hidden;
+
+  border: 1px solid var(--border-chart);
+  border-radius: 2px;
+
+  background: #06111C;
+}
+
+
+/* =========================================================
+   MAP OVERLAY
+   ========================================================= */
+
+.map-overlay {
+  position: absolute;
+  inset: 0;
+
+  pointer-events: none;
+
+  background:
+    linear-gradient(
+      90deg,
+      transparent 49.8%,
+      rgba(233, 226, 204, 0.12) 50%,
+      transparent 50.2%
+    ),
+    linear-gradient(
+      0deg,
+      transparent 49.8%,
+      rgba(233, 226, 204, 0.12) 50%,
+      transparent 50.2%
+    );
+}
+
+
+/* =========================================================
+   CHAT LOG PLATES
+   ========================================================= */
+
+.chat-user {
+  border-left: 3px solid var(--chart-buff);
+
+  background: var(--chart-buff);
+  color: var(--ink);
+}
+
+.chat-agent {
+  border-left: 3px solid var(--sounding-blue);
+
+  background: var(--sounding-blue);
+  color: var(--chart-buff);
+}
+
+
+/* =========================================================
+   DATA CITATION CHIPS
+   ========================================================= */
+
+.instrument-chip {
+  display: inline-flex;
+  align-items: center;
+
+  border: 1px solid var(--border-chart);
+
+  border-radius: 2px;
+
+  padding: 2px 6px;
+
+  background: var(--app-background);
+
+  font-family:
+    "IBM Plex Mono",
+    "SFMono-Regular",
+    Consolas,
+    monospace;
+
+  font-size: 0.72rem;
+
+  color: var(--chart-buff);
+}
+
+
+/* =========================================================
+   LABELS
+   ========================================================= */
+
+.chart-label {
+  font-family:
+    "IBM Plex Sans",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+
+  font-size: 0.72rem;
+  font-weight: 600;
+
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+
+  color: var(--text-muted);
+}
+
+
+/* =========================================================
+   INPUTS
+   ========================================================= */
+
+.chart-input {
+  width: 100%;
+
+  border: 1px solid var(--border-chart);
+  border-radius: 2px;
+
+  background: #06111C;
+  color: var(--chart-buff);
+
+  padding: 10px 12px;
+}
+
+.chart-input::placeholder {
+  color: var(--text-faint);
+}
+
+.chart-input:hover {
+  border-color: var(--border-chart-strong);
+}
+
+.chart-input:focus {
+  border-color: var(--caution-amber);
+}
+
+
+/* =========================================================
+   CHART BUTTONS
+   ========================================================= */
+
+.chart-button {
+  border: 1px solid var(--border-chart);
+  border-radius: 2px;
+
+  background: var(--surface-secondary);
+  color: var(--chart-buff);
+
+  padding: 9px 16px;
+
+  font-size: 0.85rem;
+  font-weight: 600;
+
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.chart-button:hover {
+  border-color: var(--border-chart-strong);
+  background: var(--chart-navy);
+}
+
+.chart-button-primary {
+  border-color: var(--chart-buff);
+
+  background: var(--chart-buff);
+  color: var(--ink);
+}
+
+.chart-button-primary:hover {
+  background: #f2ecd9;
+}
+
+
+/* =========================================================
+   STATUS LABELS
+   ========================================================= */
+
+.status-live {
+  color: var(--starboard-green);
+}
+
+.status-cached {
+  color: var(--caution-amber);
+}
+
+.status-unavailable {
+  color: var(--text-muted);
+}
+
+
+/* =========================================================
+   SCROLLBARS
+   ========================================================= */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color:
+    rgba(233, 226, 204, 0.25)
+    transparent;
+}
+
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(233, 226, 204, 0.22);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(233, 226, 204, 0.35);
+}
+
+
+/* =========================================================
+   LEAFLET
+   ========================================================= */
+
+.leaflet-container {
+  font-family:
+    "IBM Plex Sans",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+
+  background: #06111C;
+}
+
+.leaflet-control-zoom a {
+  background: #0B2545 !important;
+  color: #E9E2CC !important;
+
+  border-color: rgba(233, 226, 204, 0.25) !important;
+}
+
+.leaflet-control-attribution {
+  background: rgba(5, 13, 21, 0.85) !important;
+  color: rgba(233, 226, 204, 0.65) !important;
+}
+
+.leaflet-control-attribution a {
+  color: #E9E2CC !important;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 768px) {
+  .compass-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .compass-cell {
+    min-height: 70px;
+  }
+}
+
+
+/* =========================================================
+   REDUCED MOTION
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
