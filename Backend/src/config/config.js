@@ -22,9 +22,9 @@ const config = {
 
   services: {
     ai: {
-      url:
-        process.env.AI_SERVICE_URL ||
-        "http://localhost:8000",
+      url: process.env.AI_SERVICE_URL || "http://localhost:8000",
+      analyzeEndpoint:
+        process.env.AI_ANALYZE_ENDPOINT || "/api/v1/analyze",
     },
 
     gis: {

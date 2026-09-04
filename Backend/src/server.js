@@ -17,6 +17,8 @@ const analysisRoutes = require("./routes/analysis.routes");
 const gisRoutes = require("./routes/gis.routes");
 const oceanRoutes = require("./routes/ocean.routes");
 const ecosystemRoutes = require("./routes/ecosystem.routes");
+const chatRoutes = require("./routes/chat.routes");
+const dataRoutes = require("./routes/data.routes");
 
 
 const app = express();
@@ -49,6 +51,8 @@ app.use("/api/v1/analysis", analysisRoutes);
 app.use("/api/v1/gis", gisRoutes);
 app.use("/api/v1/ocean", oceanRoutes);
 app.use("/api/v1/ecosystem", ecosystemRoutes);
+app.use("/api/v1/chat", chatRoutes);
+app.use("/api/v1/data", dataRoutes);
 // ==========================================
 // ERROR HANDLER
 // ==========================================

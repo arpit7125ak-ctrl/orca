@@ -99,8 +99,12 @@ const callAI = async ({
       uses a different endpoint.
     */
 
-    const url =
-      new URL(`${baseUrl}/api/v1/analyze`);
+   const endpoint =
+  config.services.ai.analyzeEndpoint
+    .replace(/^\/+/, "");
+
+const url =
+  new URL(`${baseUrl}/${endpoint}`);
 
 
     console.log(

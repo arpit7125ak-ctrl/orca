@@ -6,7 +6,9 @@ const { getGISData } = require("./gis.service");
 const { getOceanData } = require("./ocean.service");
 const { getEcosystemData } = require("./ecosystem.service");
 const { getWeather } = require("./weather.service");
-const { callAI } = require("./ai.service");
+const {
+  saveSnapshot,
+} = require("./snapshot.service");
 
 const { badRequest, notFound } = require("../utils/errors");
 
@@ -91,10 +93,6 @@ const createAnalysis = async ({
   });
 
 
-  // ======================================
-  // FAILURE TRACKING
-  // ======================================
-
   let hasFailure = false;
 
 
@@ -111,7 +109,7 @@ const createAnalysis = async ({
 
 
     console.log(
-      `========================================`
+      "========================================"
     );
 
     console.log(
@@ -133,12 +131,48 @@ const createAnalysis = async ({
         `[GIS] ${zone.zoneId} started`
       );
 
-      const gisResult = await getGISData({
-        latitude,
-        longitude,
-      });
+      const gisResult =
+        await getGISData({
+          latitude,
+          longitude,
+        });
 
       zone.gis = gisResult;
+
+
+      // Save GIS snapshot
+
+      if (gisResult.status === "available") {
+
+        await saveSnapshot({
+
+          analysisId,
+
+          zoneId: zone.zoneId,
+
+          source:
+            gisResult.source ||
+            "GIS",
+
+          variable: "gis_data",
+
+          value:
+            gisResult.data,
+
+          unit: null,
+
+          validAt: null,
+
+          dataType: "gis",
+
+          quality: "available",
+
+          status: "available",
+
+        });
+
+      }
+
 
       console.log(
         `[GIS] ${zone.zoneId} completed`
@@ -154,10 +188,49 @@ const createAnalysis = async ({
       );
 
       zone.gis = {
+
         status: "error",
+
         data: null,
+
         reason: error.message,
+
       };
+
+
+      // Save GIS failure snapshot
+
+      await saveSnapshot({
+
+        analysisId,
+
+        zoneId: zone.zoneId,
+
+        source: "GIS",
+
+        variable: "gis_data",
+
+        value: null,
+
+        unit: null,
+
+        validAt: null,
+
+        dataType: "gis",
+
+        quality: "error",
+
+        status: "error",
+
+      }).catch((snapshotError) => {
+
+        console.error(
+          "[SNAPSHOT] GIS save failed:",
+          snapshotError.message
+        );
+
+      });
+
     }
 
 
@@ -183,13 +256,95 @@ const createAnalysis = async ({
       zone.ocean = oceanResult;
 
 
-      // Check individual ocean services
+      // ======================================
+      // TIDE SNAPSHOT
+      // ======================================
+
+      if (
+        oceanResult.tide?.status ===
+        "available"
+      ) {
+
+        await saveSnapshot({
+
+          analysisId,
+
+          zoneId: zone.zoneId,
+
+          source:
+            oceanResult.tide.source ||
+            "Tide API",
+
+          variable: "tide_data",
+
+          value:
+            oceanResult.tide.data,
+
+          unit: null,
+
+          validAt: null,
+
+          dataType: "forecast",
+
+          quality: "available",
+
+          status: "available",
+
+        });
+
+      }
+
+
+      // ======================================
+      // PFZ SNAPSHOT
+      // ======================================
+
+      if (
+        oceanResult.pfz?.status ===
+        "available"
+      ) {
+
+        await saveSnapshot({
+
+          analysisId,
+
+          zoneId: zone.zoneId,
+
+          source:
+            oceanResult.pfz.source ||
+            "PFZ API",
+
+          variable: "pfz_data",
+
+          value:
+            oceanResult.pfz.data,
+
+          unit: null,
+
+          validAt: null,
+
+          dataType: "forecast",
+
+          quality: "available",
+
+          status: "available",
+
+        });
+
+      }
+
+
+      // ======================================
+      // OCEAN FAILURE
+      // ======================================
 
       if (
         oceanResult.tide?.status === "error" ||
         oceanResult.pfz?.status === "error"
       ) {
+
         hasFailure = true;
+
       }
 
 
@@ -209,18 +364,61 @@ const createAnalysis = async ({
       zone.ocean = {
 
         tide: {
+
           status: "error",
+
           data: null,
+
           reason: error.message,
+
         },
 
         pfz: {
+
           status: "error",
+
           data: null,
+
           reason: error.message,
+
         },
 
       };
+
+
+      // Save Ocean failure snapshot
+
+      await saveSnapshot({
+
+        analysisId,
+
+        zoneId: zone.zoneId,
+
+        source: "Ocean Service",
+
+        variable: "ocean_data",
+
+        value: null,
+
+        unit: null,
+
+        validAt: null,
+
+        dataType: "forecast",
+
+        quality: "error",
+
+        status: "error",
+
+      }).catch((snapshotError) => {
+
+        console.error(
+          "[SNAPSHOT] Ocean save failed:",
+          snapshotError.message
+        );
+
+      });
+
     }
 
 
@@ -236,19 +434,66 @@ const createAnalysis = async ({
 
       const ecosystemResult =
         await getEcosystemData({
+
           latitude,
+
           longitude,
+
           date,
+
         });
+
 
       zone.ecosystem =
         ecosystemResult;
 
 
+      // Save ecosystem snapshot
+
+      if (
+        ecosystemResult.status ===
+        "available"
+      ) {
+
+        await saveSnapshot({
+
+          analysisId,
+
+          zoneId: zone.zoneId,
+
+          source:
+            ecosystemResult.source ||
+            "Ecosystem API",
+
+          variable:
+            "ecosystem_data",
+
+          value:
+            ecosystemResult.data,
+
+          unit: null,
+
+          validAt: date
+            ? new Date(date)
+            : null,
+
+          dataType: "forecast",
+
+          quality: "available",
+
+          status: "available",
+
+        });
+
+      }
+
+
       if (
         ecosystemResult.status === "error"
       ) {
+
         hasFailure = true;
+
       }
 
 
@@ -274,6 +519,41 @@ const createAnalysis = async ({
         reason: error.message,
 
       };
+
+
+      // Save ecosystem failure snapshot
+
+      await saveSnapshot({
+
+        analysisId,
+
+        zoneId: zone.zoneId,
+
+        source: "Ecosystem API",
+
+        variable: "ecosystem_data",
+
+        value: null,
+
+        unit: null,
+
+        validAt: null,
+
+        dataType: "forecast",
+
+        quality: "error",
+
+        status: "error",
+
+      }).catch((snapshotError) => {
+
+        console.error(
+          "[SNAPSHOT] Ecosystem save failed:",
+          snapshotError.message
+        );
+
+      });
+
     }
 
 
@@ -290,10 +570,15 @@ const createAnalysis = async ({
 
       const weatherResult =
         await getWeather({
+
           latitude,
+
           longitude,
+
           date,
+
           time,
+
         });
 
 
@@ -301,10 +586,56 @@ const createAnalysis = async ({
         weatherResult;
 
 
+      // Save weather snapshot
+
+      if (
+        weatherResult.status ===
+        "available"
+      ) {
+
+        await saveSnapshot({
+
+          analysisId,
+
+          zoneId: zone.zoneId,
+
+          source:
+            weatherResult.source ||
+            "Open-Meteo",
+
+          variable:
+            "weather_data",
+
+          value:
+            weatherResult.selected ||
+            weatherResult.data,
+
+          unit: null,
+
+          validAt:
+            weatherResult.selected?.time
+              ? new Date(
+                weatherResult.selected.time
+              )
+              : null,
+
+          dataType: "forecast",
+
+          quality: "available",
+
+          status: "available",
+
+        });
+
+      }
+
+
       if (
         weatherResult.status === "error"
       ) {
+
         hasFailure = true;
+
       }
 
 
@@ -330,68 +661,43 @@ const createAnalysis = async ({
         reason: error.message,
 
       };
+
+
+      // Save weather failure snapshot
+
+      await saveSnapshot({
+
+        analysisId,
+
+        zoneId: zone.zoneId,
+
+        source: "Open-Meteo",
+
+        variable: "weather_data",
+
+        value: null,
+
+        unit: null,
+
+        validAt: null,
+
+        dataType: "forecast",
+
+        quality: "error",
+
+        status: "error",
+
+      }).catch((snapshotError) => {
+
+        console.error(
+          "[SNAPSHOT] Weather save failed:",
+          snapshotError.message
+        );
+
+      });
+
     }
 
-    // ======================================
-// AI ANALYSIS
-// ======================================
-
-try {
-  console.log(
-    `[AI] ${zone.zoneId} started`
-  );
-
-  const aiResult = await callAI({
-    analysisId,
-    request: {
-      activity,
-      date,
-      time,
-    },
-    zones: [zone],
-  });
-
-  if (aiResult.status === "available") {
-    const aiData = aiResult.data;
-
-    zone.risk =
-      aiData.risk ||
-      aiData.data?.risk ||
-      null;
-
-    zone.recommendation =
-      aiData.recommendation ||
-      aiData.data?.recommendation ||
-      null;
-  } else {
-    hasFailure = true;
-  }
-
-  console.log(
-    `[AI] ${zone.zoneId} completed`
-  );
-
-} catch (error) {
-
-  hasFailure = true;
-
-  console.error(
-    `[AI] ${zone.zoneId} failed:`,
-    error.message
-  );
-
-  zone.risk = {
-    status: "unavailable",
-    data: null,
-    reason: error.message,
-  };
-
-  zone.recommendation = {
-    status: "unavailable",
-    data: null,
-    reason: error.message,
-  };
-}
 
     // ======================================
     // ZONE COMPLETE
@@ -402,8 +708,9 @@ try {
     );
 
     console.log(
-      `========================================`
+      "========================================"
     );
+
   }
 
 
@@ -411,31 +718,27 @@ try {
   // UPDATE ANALYSIS STATUS
   // ======================================
 
-  analysis.status = hasFailure
-    ? "partial"
-    : "processing";
+  analysis.status =
+    hasFailure
+      ? "partial"
+      : "completed";
 
 
   // ======================================
-  // SAVE ALL ZONE DATA
+  // SAVE ZONE DATA
   // ======================================
 
-  await Analysis.updateOne(
-    {
-      analysisId,
+ await Analysis.updateOne(
+  {
+    analysisId,
+  },
+  {
+    $set: {
+      zones: analysis.zones,
+      status: analysis.status,
     },
-
-    {
-      $set: {
-
-        zones: analysis.zones,
-
-        status: analysis.status,
-
-      },
-    }
-  );
-
+  }
+);
 
   // ======================================
   // GET UPDATED ANALYSIS
@@ -448,6 +751,7 @@ try {
 
 
   return updatedAnalysis;
+
 };
 
 
@@ -475,6 +779,7 @@ const getAnalysis = async (
 
 
   return analysis;
+
 };
 
 
@@ -488,6 +793,7 @@ const getAnalysisStatus = async (
 
   const analysis =
     await Analysis.findOne(
+
       {
         analysisId,
       },
@@ -498,6 +804,7 @@ const getAnalysisStatus = async (
         analysisId: 1,
 
         status: 1,
+
       }
 
     ).lean();
@@ -513,6 +820,7 @@ const getAnalysisStatus = async (
 
 
   return analysis;
+
 };
 
 
@@ -526,7 +834,9 @@ const deleteAnalysis = async (
 
   const analysis =
     await Analysis.findOneAndDelete({
+
       analysisId,
+
     });
 
 
@@ -540,6 +850,7 @@ const deleteAnalysis = async (
 
 
   return analysis;
+
 };
 
 
