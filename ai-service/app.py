@@ -25,7 +25,7 @@ def health_check() -> Dict[str, Any]:
     }
 
 
-@app.post("/analyze", response_model=AnalysisResponse)
+@app.post("/api/v1/analyze", response_model=AnalysisResponse)
 def analyze(request: AnalysisRequest) -> AnalysisResponse:
     """
     Run the complete ORCA marine intelligence workflow.
@@ -59,19 +59,11 @@ def analyze(request: AnalysisRequest) -> AnalysisResponse:
                 request.analysisId,
             ),
             "success": result.get("success", False),
-            "zones": result.get("zone_results", {}),
-            "decision": result.get("decision"),
+"zones": list(
+    result.get("zone_results", {}).values()
+),            "decision": result.get("decision"),
             "errors": result.get("errors", []),
-            "data_quality": {
-                "partial": result.get("partial", False),
-                "zone_count": len(result.get("zones", [])),
-                "successful_zone_count": sum(
-                    1
-                    for zone_result in result.get("zone_results", {}).values()
-                    if isinstance(zone_result, dict)
-                    and not zone_result.get("partial", False)
-                ),
-            },
+            "data_quality": [],
         }
 
         try:

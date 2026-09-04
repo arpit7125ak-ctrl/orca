@@ -1,0 +1,1186 @@
+ORCA AI-SERVICE — DETAILED EXPLANATION
+=========================================
+
+1. PROJECT OVERVIEW
+-------------------
+The project is ORCA, a Marine Intelligence platform designed around an agentic AI architecture.
+
+The AI-Service is the intelligence layer. Its job is to receive structured marine-analysis requests from the Backend, collect/use environmental information through service adapters, run domain-specific agents, combine their results through a LangGraph workflow, and return structured evidence-based decisions.
+
+The intended high-level communication is:
+
+Frontend
+   |
+   v
+Backend
+   |
+   v
+AI-Service
+   |
+   +--> Weather Service
+   +--> Ocean Service
+   +--> Ecosystem Service
+   +--> Cyclone Service
+   +--> Tide Service
+   +--> PFZ Service
+   +--> GIS Service
+   |
+   v
+Structured Marine Analysis
+   |
+   +--> Weather Agent
+   +--> Ocean Agent
+   +--> Ecosystem Agent
+   +--> Risk Agent
+   +--> Decision Agent
+   |
+   v
+Backend
+   |
+   v
+Frontend
+
+
+2. IMPORTANT OWNERSHIP RULE
+----------------------------
+The AI developer's work is restricted to AI-Service/.
+
+The AI-Service should not directly modify or own:
+- Frontend/
+- Backend/
+- GIS-Service/
+- Ecosystem-Service/
+- Data/
+- Docs/
+- Scripts/
+- .github/
+- root-level project files
+
+The Frontend should not call the AI-Service directly.
+
+The expected architecture is:
+
+Frontend -> Backend -> AI-Service
+
+
+3. AI-SERVICE FOLDER STRUCTURE
+------------------------------
+The required structure is:
+
+AI-Service/
+├── agents/
+│   ├── weather_agent.py
+│   ├── ocean_agent.py
+│   ├── ecosystem_agent.py
+│   ├── risk_agent.py
+│   └── decision_agent.py
+├── graph/
+│   ├── workflow.py
+│   ├── state.py
+│   └── nodes.py
+├── chains/
+│   ├── weather_chain.py
+│   ├── ocean_chain.py
+│   ├── ecosystem_chain.py
+│   ├── risk_chain.py
+│   └── decision_chain.py
+├── chat/
+│   ├── __init__.py
+│   ├── workflow.py
+│   ├── state.py
+│   ├── router.py
+│   ├── memory.py
+│   ├── context.py
+│   ├── response.py
+│   └── prompts.py
+├── tools/
+│   ├── weather_tool.py
+│   ├── ocean_tool.py
+│   ├── ecosystem_tool.py
+│   └── gis_tool.py
+├── services/
+│   ├── weather_service.py
+│   ├── ocean_service.py
+│   ├── ecosystem_service.py
+│   └── gis_service.py
+├── prompts/
+│   ├── weather_prompt.txt
+│   ├── ocean_prompt.txt
+│   ├── ecosystem_prompt.txt
+│   ├── risk_prompt.txt
+│   └── decision_prompt.txt
+├── models/
+│   └── schemas.py
+├── utils/
+│   └── helpers.py
+├── app.py
+├── requirements.txt
+├── .env
+├── .env.example
+└── README.md
+
+
+4. models/schemas.py
+--------------------
+This is the structured validation layer.
+
+It defines Pydantic models and enums for:
+- AnalysisRequest
+- AnalysisResponse
+- Zone
+- ZoneResult
+- WeatherAssessment
+- OceanAssessment
+- EcosystemAssessment
+- RiskAssessment
+- DecisionAssessment
+- ChatRequest
+- ChatResponse
+- Evidence
+- errors and data-quality states
+
+Important behavior:
+- analysisId identifies an analysis.
+- zoneId identifies a zone.
+- zones must contain unique zoneIds.
+- Zone results preserve their zoneId.
+- Evidence can contain variable, value, unit, source, timestamp, status, quality, forecast lead time, and notes.
+- Data status includes observed, forecast, missing, unavailable, stale, low_quality, and error.
+- Risk levels include low, moderate, high, critical, and unknown.
+
+This prevents different agents from returning arbitrary or inconsistent structures.
+
+
+5. utils/helpers.py
+-------------------
+This file contains shared utility functions.
+
+It handles:
+- UTC timestamps
+- datetime normalization
+- zone lookup
+- unique zone validation
+- nested dictionary access
+- missing-value checks
+- evidence construction
+- error construction
+- confidence clamping
+- confidence reduction for missing components
+- safe text handling
+- prompt-injection boundary marking
+
+A key design principle is that missing data is preserved instead of silently converted into a value.
+
+The helper for user input also marks user-provided text as untrusted so it cannot override system rules.
+
+
+6. SERVICES LAYER
+-----------------
+The services layer is the adapter layer.
+
+Its purpose is to keep provider-specific HTTP/API logic separate from agents.
+
+Weather:
+    services/weather_service.py
+
+Ocean:
+    services/ocean_service.py
+
+Ecosystem:
+    services/ecosystem_service.py
+
+GIS:
+    services/gis_service.py
+
+This separation means the agents do not need to know the details of how an external provider is contacted.
+
+If a provider changes, the service adapter can be changed without redesigning the agent.
+
+
+7. WEATHER SERVICE
+------------------
+The Weather Service uses Open-Meteo by default.
+
+Configured endpoint:
+    https://api.open-meteo.com/v1/forecast
+
+It requests weather information such as:
+- temperature
+- humidity
+- apparent temperature
+- precipitation
+- rain
+- weather code
+- pressure
+- wind speed
+- wind direction
+- wind gusts
+- visibility
+
+The service normalizes the provider response and preserves:
+- source
+- timestamp
+- status
+- metadata
+- requested location
+
+It also converts provider/request failures into structured errors.
+
+
+8. OCEAN SERVICE
+----------------
+The Ocean Service is designed as a configurable adapter.
+
+It can consume an Ocean API through:
+    OCEAN_API_URL
+
+It understands variables such as:
+- wave height
+- wave period
+- wave direction
+- current speed
+- current direction
+- tide height
+- tide
+- sea-surface temperature
+- sea state
+- depth
+
+If no Ocean URL is configured, the service explicitly returns an unavailable state instead of inventing ocean data.
+
+You later indicated that an actual Ocean URL exists. That URL should be placed in OCEAN_API_URL in .env.
+
+
+9. ECOSYSTEM SERVICE
+--------------------
+The Ecosystem Service is a configurable adapter.
+
+It can consume the Ecosystem backend through:
+    OCEAN_API_URL is NOT used for this;
+    ECOSYSTEM_API_URL is used.
+
+The service understands:
+- ecosystem condition
+- sensitivity
+- biodiversity
+- biodiversity index
+- chlorophyll
+- chlorophyll-a
+- productivity
+- primary productivity
+- habitat
+- habitat type
+- protected area
+- protected area status
+- sensitive area
+- ecological constraints
+
+The actual Ecosystem backend you provided is:
+
+    https://orca-backend-ecosystem.onrender.com/api/ecosystem
+
+The endpoint expects latitude, longitude, and date as query parameters.
+
+The example query you provided used:
+    latitude=19.076
+    longitude=72.8777
+    date=2026-09-05
+
+The AI-Service should generate these values dynamically from the current zone and planned datetime rather than hardcode the example.
+
+
+10. GIS SERVICE
+---------------
+The GIS Service is a configurable adapter.
+
+Configured endpoint:
+    https://orca-backend-gis.onrender.com/api/gis
+
+It accepts:
+- latitude
+- longitude
+
+The GIS service can process spatial information such as:
+- classification
+- distance to coast
+- distance to port
+- distance to habitat
+- protected-area information
+- sensitive-area information
+- marine zone
+- bathymetry
+- depth
+- geometry
+- intersections
+
+It also contains a haversine-based distance calculation and pairwise zone-distance support.
+
+Zone identity is always based on zoneId.
+
+
+11. ADDITIONAL BACKEND SERVICES PROVIDED
+-----------------------------------------
+You provided these actual backend endpoints:
+
+Cyclone:
+    https://orca-backend-gkvo.onrender.com/api/cyclone
+
+Tide:
+    https://orca-backend-tide.onrender.com/tide
+
+Ecosystem:
+    https://orca-backend-ecosystem.onrender.com/api/ecosystem
+
+PFZ:
+    https://orca-backend-fz.onrender.com/api/pfz
+
+GIS:
+    https://orca-backend-gis.onrender.com/api/gis
+
+Weather:
+    https://api.open-meteo.com/v1/forecast
+
+The example query parameters you supplied for Cyclone, Tide, Ecosystem, and PFZ are examples of runtime parameters and should not be hardcoded into the base URLs in .env.
+
+For example, the Cyclone base URL is:
+
+    CYCLONE_API_URL=https://orca-backend-gkvo.onrender.com/api/cyclone
+
+and latitude, longitude, and radius should be supplied dynamically by the calling service/tool.
+
+
+12. TOOLS LAYER
+---------------
+The tools layer provides small controlled wrappers around services.
+
+Current tools:
+- weather_tool.py
+- ocean_tool.py
+- ecosystem_tool.py
+- gis_tool.py
+
+The tools:
+- validate coordinates
+- call the appropriate service
+- return normalized results
+- catch errors
+- return structured error information
+
+They do not perform uncontrolled reasoning.
+
+This keeps external access explicit and controlled.
+
+
+13. WEATHER AGENT
+-----------------
+The Weather Agent interprets weather information.
+
+It checks variables such as:
+- temperature
+- precipitation
+- visibility
+- pressure
+- wind speed
+- wind direction
+- wind gusts
+- weather code
+
+It produces:
+- zoneId
+- status
+- summary
+- evidence
+- missing variables
+- data completeness
+- source
+- timestamp
+- planned datetime
+- error information where needed
+
+The agent does not invent missing weather values.
+
+
+14. OCEAN AGENT
+---------------
+The Ocean Agent interprets marine/ocean conditions.
+
+It considers:
+- wave height
+- wave period
+- wave direction
+- currents
+- tide
+- sea-surface temperature
+- sea state
+- depth
+
+It preserves evidence and provenance.
+
+If a variable is absent, it remains missing/unavailable.
+
+The Ocean Agent does not fabricate values.
+
+
+15. ECOSYSTEM AGENT
+-------------------
+The Ecosystem Agent interprets ecological information.
+
+It considers:
+- ecosystem condition
+- sensitivity
+- biodiversity
+- chlorophyll
+- productivity
+- habitat
+- protected areas
+- sensitive areas
+- ecological constraints
+
+It produces explicit missing-variable information and evidence.
+
+It does not assume that an area is protected, sensitive, productive, or biologically rich unless the supplied data supports that conclusion.
+
+
+16. RISK AGENT
+-------------
+The Risk Agent combines:
+
+    Weather Agent
+          +
+    Ocean Agent
+          +
+    Ecosystem Agent
+          |
+          v
+      Risk Agent
+
+It generates:
+- risk_level
+- risk_factors
+- confidence
+- failed_domains
+- limitations
+- summary
+
+Risk levels:
+- low
+- moderate
+- high
+- critical
+- unknown
+
+The current deterministic implementation uses supplied evidence to identify factors such as elevated wind, gusts, precipitation, low visibility, large waves, long wave period, strong currents, ecological sensitivity, protected areas, sensitive areas, and ecological constraints.
+
+These rules are based only on supplied variables. The agent does not invent environmental measurements.
+
+
+17. DECISION AGENT
+------------------
+The Decision Agent converts the risk and domain evidence into an operational recommendation.
+
+It generates:
+- zoneId
+- risk level
+- recommendation
+- key reasons
+- confidence
+- evidence
+- limitations
+- component summaries
+- data quality
+
+Example decision logic:
+- Critical: avoid/defer until reassessed.
+- High: strong caution; consider postponing or selecting a lower-risk zone.
+- Moderate: proceed only with appropriate caution and reassessment.
+- Low: no major risk signal identified from supplied evidence.
+- Unknown: insufficient evidence for a reliable recommendation.
+
+These are decision-language categories, not invented environmental measurements or legal rules.
+
+The Decision Agent does not independently claim that an activity is legally permitted or prohibited.
+
+
+18. CHAINS
+---------
+The chain files provide controlled orchestration between the graph/nodes and the domain agents.
+
+Files:
+- weather_chain.py
+- ocean_chain.py
+- ecosystem_chain.py
+- risk_chain.py
+- decision_chain.py
+
+They:
+- validate zone information
+- validate zoneId
+- validate coordinates where needed
+- call the relevant agent
+- validate returned zoneId
+- create structured errors when failures occur
+
+This adds a layer of controlled execution around the agents.
+
+
+19. LANGGRAPH STATE
+------------------
+graph/state.py defines the shared state.
+
+The state contains:
+- analysis_id
+- request
+- zones
+- zone_results
+- weather_results
+- ocean_results
+- ecosystem_results
+- risk_results
+- decision_results
+- decision
+- errors
+- success
+- partial
+
+Results are stored by zoneId.
+
+Example:
+
+    zone_results["ZONE_001"]
+    zone_results["ZONE_002"]
+
+This is important because array position must never determine zone identity.
+
+
+20. LANGGRAPH NODES
+-------------------
+graph/nodes.py implements the actual graph nodes.
+
+The nodes are:
+- weather_node
+- ocean_node
+- ecosystem_node
+- risk_node
+- decision_node
+- finalize_node
+
+Each node processes zones using their stable zoneId.
+
+If a node fails for one zone:
+- the zone is preserved
+- an error is stored
+- the analysis can become partial
+- successful results are preserved
+
+
+21. LANGGRAPH WORKFLOW
+----------------------
+graph/workflow.py builds the main workflow:
+
+    START
+      |
+      v
+    Weather
+      |
+      v
+    Ocean
+      |
+      v
+    Ecosystem
+      |
+      v
+    Risk
+      |
+      v
+    Decision
+      |
+      v
+    Finalize
+      |
+      v
+    END
+
+The workflow is compiled into marine_graph.
+
+run_analysis(request) creates the initial state and invokes marine_graph.
+
+
+22. MULTI-ZONE SUPPORT
+---------------------
+Multi-zone analysis is a core requirement.
+
+Example:
+
+    Zone A -> zoneId = ZONE_001
+    Zone B -> zoneId = ZONE_002
+    Zone C -> zoneId = ZONE_003
+
+Every agent receives the zone information and returns the same zoneId.
+
+The system validates that:
+- zoneIds are unique
+- result zoneId matches the zone
+- result maps do not contain unknown zoneIds
+- data from different zones is not mixed
+
+This is more reliable than assuming that result[0] belongs to zone 0, result[1] belongs to zone 1, etc.
+
+
+23. PARTIAL FAILURE HANDLING
+----------------------------
+The architecture does not require every service to succeed.
+
+For example:
+
+    Weather -> SUCCESS
+    Ocean -> SUCCESS
+    Ecosystem -> ERROR
+
+The system should preserve the Weather and Ocean results, mark the Ecosystem component as failed, reduce/qualify confidence, and let Risk/Decision communicate the limitation.
+
+It must never replace the missing Ecosystem result with invented data.
+
+
+24. DATA PROVENANCE
+-------------------
+Environmental evidence should preserve:
+
+- variable
+- value
+- unit
+- source
+- timestamp
+- forecast/observation status
+- quality
+- notes
+
+This allows the final recommendation to be traceable back to the supplied environmental data.
+
+The system is designed so that a value without provenance is not silently treated as high-quality evidence.
+
+
+25. CONFIDENCE
+--------------
+Confidence represents evidence quality and completeness.
+
+It is NOT:
+- a probability of truth
+- a guarantee
+- a statistical forecast unless explicitly calculated by a validated model
+
+Confidence can be affected by:
+- missing variables
+- failed domains
+- poor-quality data
+- unavailable sources
+- stale data
+- incomplete evidence
+
+The implementation avoids false precision.
+
+
+26. CHAT SYSTEM
+--------------
+The chat subsystem contains:
+
+    chat/state.py
+    chat/router.py
+    chat/memory.py
+    chat/context.py
+    chat/response.py
+    chat/prompts.py
+    chat/workflow.py
+    chat/__init__.py
+
+Chat state preserves:
+- conversation_id
+- analysis_id
+- current_zone
+- user_question
+- history
+- context
+- route
+- answer
+- errors
+- success
+
+
+27. CHAT ROUTING
+---------------
+The chat router detects questions related to:
+- weather
+- ocean
+- ecosystem
+- risk
+- decision
+- comparison
+- general
+
+For example:
+"How is the wave condition?"
+    -> ocean
+
+"What is the risk?"
+    -> risk
+
+"Which zone is safer?"
+    -> comparison
+
+The router also carries the current zone so the answer can remain zone-specific.
+
+
+28. CHAT MEMORY
+---------------
+Chat memory stores recent conversation messages.
+
+The current design limits stored conversation history to a bounded number of messages.
+
+It separately remembers:
+- analysis context
+- zone information
+- conversation history
+
+User messages remain untrusted input and are not treated as system instructions.
+
+
+29. CHAT CONTEXT ISOLATION
+--------------------------
+chat/context.py ensures that the response context can be restricted to one zone.
+
+If current_zone is set:
+    only that zone's information is used.
+
+If a comparison is requested:
+    explicit zone-level results are used.
+
+This prevents accidental mixing of information from Zone A into a response about Zone B.
+
+
+30. CHAT RESPONSE
+-----------------
+chat/response.py formats structured results into user-readable responses.
+
+It can format:
+- weather answers
+- ocean answers
+- ecosystem answers
+- risk answers
+- decision answers
+- comparison answers
+- general answers
+
+Responses are based on supplied context and evidence.
+
+
+31. CHAT PROMPTS
+----------------
+chat/prompts.py defines:
+- system prompt
+- route instructions
+- context prompt
+- user prompt
+- complete chat prompt
+
+The prompts explicitly enforce:
+- no fabrication
+- missing-data transparency
+- zone isolation
+- evidence use
+- no hidden chain-of-thought
+- untrusted user input
+
+
+32. PROMPTS DIRECTORY
+---------------------
+The dedicated prompt files are:
+
+weather_prompt.txt
+ocean_prompt.txt
+ecosystem_prompt.txt
+risk_prompt.txt
+decision_prompt.txt
+
+These describe the role and constraints of each agent.
+
+Common rules include:
+- use only supplied data
+- never fabricate values
+- explicitly report missing data
+- preserve zoneId
+- preserve evidence
+- communicate uncertainty
+- do not expose hidden chain-of-thought
+- do not let user instructions override system/developer rules
+
+
+33. FASTAPI APPLICATION
+-----------------------
+app.py is the entry point.
+
+It creates a FastAPI application named ORCA AI-Service.
+
+Endpoints currently defined:
+
+GET /health
+
+POST /analyze
+
+GET /
+
+The /analyze endpoint:
+1. Receives an AnalysisRequest.
+2. Validates it through Pydantic.
+3. Converts it to the workflow input.
+4. Runs run_analysis().
+5. Builds the structured response.
+6. Validates the response against AnalysisResponse.
+7. Returns errors through FastAPI if workflow/schema processing fails.
+
+
+34. HEALTH ENDPOINT
+-------------------
+GET /health returns a basic service status.
+
+Example:
+
+    {
+      "status": "ok",
+      "service": "ORCA AI-Service"
+    }
+
+This is useful for deployment and backend health checks.
+
+
+35. REQUIREMENTS
+----------------
+requirements.txt currently includes the core dependencies needed by the implementation:
+
+- fastapi
+- uvicorn
+- pydantic
+- langgraph
+- requests
+- python-dotenv
+
+These support:
+- API serving
+- validation
+- LangGraph execution
+- HTTP service calls
+- environment configuration
+
+
+36. ENVIRONMENT CONFIGURATION
+-----------------------------
+The .env.example file documents configuration variables.
+
+The .env file is for local/private configuration.
+
+The current service URL configuration is:
+
+CYCLONE_API_URL=https://orca-backend-gkvo.onrender.com/api/cyclone
+CYCLONE_API_TIMEOUT=15
+
+TIDE_API_URL=https://orca-backend-tide.onrender.com/tide
+TIDE_API_TIMEOUT=15
+
+ECOSYSTEM_API_URL=https://orca-backend-ecosystem.onrender.com/api/ecosystem
+ECOSYSTEM_API_TIMEOUT=15
+
+PFZ_API_URL=https://orca-backend-fz.onrender.com/api/pfz
+PFZ_API_TIMEOUT=15
+
+GIS_API_URL=https://orca-backend-gis.onrender.com/api/gis
+GIS_API_TIMEOUT=15
+
+WEATHER_API_URL=https://api.open-meteo.com/v1/forecast
+WEATHER_API_TIMEOUT=15
+
+Groq configuration:
+
+GROQ_API_KEY=YOUR_NEW_GROQ_API_KEY
+
+The actual Groq secret should never be stored in this explanation file or committed to GitHub.
+
+
+37. GROQ API
+------------
+You provided a Groq API key for the project.
+
+Because an API key is a secret, it should be treated as compromised once shared publicly or in an exposed location.
+
+The correct configuration pattern is:
+
+    GROQ_API_KEY=YOUR_NEW_GROQ_API_KEY
+
+A fresh key should be generated and the previously exposed key should be revoked/rotated.
+
+The actual key is intentionally NOT reproduced in this document.
+
+
+38. IMPORTANT DISTINCTION: CURRENT AGENTS VS BACKEND SERVICES
+--------------------------------------------------------------
+The current five AI agents are:
+
+1. Weather Agent
+2. Ocean Agent
+3. Ecosystem Agent
+4. Risk Agent
+5. Decision Agent
+
+The backend also provides additional data services:
+
+- Cyclone
+- Tide
+- Ecosystem
+- PFZ
+- GIS
+- Weather/Open-Meteo
+
+Cyclone, Tide, and PFZ are backend data sources/endpoints, not automatically new AI agents.
+
+Their data should be integrated through appropriate service/tool layers and then exposed to the relevant reasoning agents without unnecessarily changing the agreed five-agent architecture.
+
+
+39. WHAT THE SYSTEM ACHIEVES
+----------------------------
+At this stage, the architecture provides:
+
+- structured input validation
+- structured output validation
+- five domain/decision agents
+- LangGraph orchestration
+- multi-zone support
+- stable zone identity
+- explicit missing-data handling
+- partial-failure handling
+- provenance/evidence handling
+- confidence handling
+- service adapters
+- controlled tools
+- FastAPI API
+- chat routing
+- chat memory
+- zone-isolated chat context
+- prompt injection boundaries
+- environment-based configuration
+
+
+40. HOW A REQUEST SHOULD FLOW
+-----------------------------
+A typical request should work like this:
+
+Step 1:
+Frontend collects the user's marine-analysis request.
+
+Step 2:
+Frontend sends the request to Backend.
+
+Step 3:
+Backend prepares the AI-Service request.
+
+Step 4:
+Backend calls:
+
+    POST /analyze
+
+Step 5:
+AI-Service validates:
+- analysisId
+- zones
+- zoneId
+- coordinates
+- planned datetime
+- activity/context
+
+Step 6:
+LangGraph starts.
+
+Step 7:
+Weather Agent obtains/interprets weather evidence.
+
+Step 8:
+Ocean Agent obtains/interprets ocean evidence.
+
+Step 9:
+Ecosystem Agent obtains/interprets ecological evidence.
+
+Step 10:
+Risk Agent combines the domain evidence.
+
+Step 11:
+Decision Agent generates the zone-level recommendation.
+
+Step 12:
+Finalize validates the zone identity and partial/success state.
+
+Step 13:
+AI-Service returns structured results to Backend.
+
+Step 14:
+Backend sends the appropriate response to Frontend.
+
+
+41. EXAMPLE MULTI-ZONE CONCEPT
+------------------------------
+Suppose the request contains:
+
+    ZONE_001
+    ZONE_002
+    ZONE_003
+
+The workflow produces:
+
+    ZONE_001
+      -> weather
+      -> ocean
+      -> ecosystem
+      -> risk
+      -> decision
+
+    ZONE_002
+      -> weather
+      -> ocean
+      -> ecosystem
+      -> risk
+      -> decision
+
+    ZONE_003
+      -> weather
+      -> ocean
+      -> ecosystem
+      -> risk
+      -> decision
+
+Then the Decision layer can compare the explicit zone-level decisions.
+
+The system must never assume:
+    first result = first zone
+
+Instead it uses:
+    zoneId -> result
+
+
+42. WHAT HAS NOT YET BEEN COMPLETED
+-----------------------------------
+The architecture is defined, but integration/testing still needs to be completed.
+
+Important remaining work includes:
+
+- Verify the actual Ocean endpoint and connect it to OCEAN_API_URL.
+- Implement service/tool adapters for Cyclone, Tide, and PFZ if they are required by the final analysis flow.
+- Ensure the API parameter names match the real backend contracts.
+- Connect the Groq LLM layer if LLM-backed reasoning is required.
+- Decide exactly which agents consume Cyclone/Tide/PFZ evidence.
+- Confirm the Backend request/response contract matches models/schemas.py.
+- Run the FastAPI service locally.
+- Test /health.
+- Test /analyze with one zone.
+- Test /analyze with two or more zones.
+- Test missing data.
+- Test service failures.
+- Test zone identity.
+- Test chat context isolation.
+- Test invalid requests.
+- Test prompt-injection boundaries.
+- Add/execute automated tests.
+
+
+43. DEPLOYMENT CONCEPT
+---------------------
+The AI-Service can be deployed as its own FastAPI service.
+
+A typical deployment command is:
+
+    uvicorn app:app --host 0.0.0.0 --port 8000
+
+The actual production port can be supplied by the deployment platform.
+
+The Backend then calls the deployed AI-Service rather than the Frontend calling it directly.
+
+
+44. SECURITY
+------------
+Important security rules:
+
+- Never commit .env.
+- Never commit real API keys.
+- Use .env.example for placeholders.
+- Rotate any secret that has been exposed.
+- Do not put secrets into frontend code.
+- Do not accept arbitrary user input as executable instructions.
+- Keep external API calls behind controlled service/tool layers.
+
+
+45. FINAL ARCHITECTURE SUMMARY
+------------------------------
+The AI-Service is essentially:
+
+    DATA/SERVICES
+          |
+          v
+    SERVICE ADAPTERS
+          |
+          v
+        TOOLS
+          |
+          v
+       AGENTS
+          |
+          v
+      LANGGRAPH
+          |
+          v
+     RISK ANALYSIS
+          |
+          v
+       DECISION
+          |
+          v
+    STRUCTURED API
+          |
+          v
+       BACKEND
+          |
+          v
+      FRONTEND
+
+The main engineering principles are:
+
+1. Evidence first.
+2. Never fabricate environmental data.
+3. Preserve source and timestamp.
+4. Explicitly represent missing information.
+5. Preserve stable zoneId.
+6. Never mix zones.
+7. Keep provider logic separate from reasoning.
+8. Handle partial failures explicitly.
+9. Confidence reflects evidence quality/completeness.
+10. Keep user input untrusted.
+11. Do not expose hidden chain-of-thought.
+12. Keep the Backend as the communication layer between Frontend and AI-Service.
+
+
+46. IN SIMPLE WORDS
+-------------------
+You have built the foundation of an agentic marine intelligence backend.
+
+The system takes marine zones and a planned activity/time, gathers environmental evidence, lets separate specialist agents understand Weather, Ocean, and Ecosystem conditions, combines those findings into a Risk assessment, and finally generates a Decision for each zone.
+
+LangGraph controls the sequence.
+
+Pydantic controls the data contract.
+
+Services handle external APIs.
+
+Tools provide controlled access to services.
+
+Agents perform domain-specific intelligence.
+
+Risk combines the domains.
+
+Decision produces the final recommendation.
+
+Chat allows users to ask follow-up questions using the stored analysis context.
+
+The design is multi-zone, evidence-based, provenance-aware, and explicitly handles missing or failed data.
