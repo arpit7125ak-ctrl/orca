@@ -1,0 +1,583 @@
+ORCA — TEAM DEVELOPMENT RULES
+Project: SIH26176 — ORCA: Marine EcOsystem Reasoning with Collaborative Agents
+
+NON-NEGOTIABLE REPOSITORY OWNERSHIP
+===================================
+This repository is intentionally divided between three developers:
+
+1. FRONTEND DEVELOPER
+   Owns ONLY: Frontend/
+
+2. AI DEVELOPER
+   Owns ONLY: AI-Service/
+
+3. BACKEND / INTEGRATION DEVELOPER (Arpit)
+   Owns the remaining project areas:
+   Backend/
+   GIS-Service/
+   Ecosystem-Service/
+   Data/
+   Docs/
+   Scripts/
+   .github/
+   root configuration files
+
+STRICT RULE:
+- Frontend developer must not modify Backend, AI-Service, GIS-Service,
+  Ecosystem-Service, Data, Docs, Scripts, .github, or root files.
+- AI developer must not modify Frontend, Backend, GIS-Service,
+  Ecosystem-Service, Data, Docs, Scripts, .github, or root files.
+- Backend developer owns all remaining folders/files and handles integration.
+- Do NOT move files between ownership areas.
+- Do NOT create duplicate folders outside the defined architecture.
+- If a change appears necessary outside your owned folder, STOP and tell Arpit.
+- Never "temporarily" edit another developer's files.
+- Never bypass this rule because it seems faster.
+
+COMMUNICATION BOUNDARY
+======================
+Frontend -> Backend API -> internal services / AI
+Backend -> AI-Service through the agreed API contract
+AI-Service -> returns structured reasoning/results
+Frontend never calls AI directly.
+
+The repository architecture is designed around clear responsibility:
+Frontend = presentation
+Backend = API/orchestration/persistence
+AI-Service = reasoning
+GIS-Service = spatial processing
+Ecosystem-Service = ecosystem data retrieval
+
+MULTI-ZONE IS MANDATORY
+=======================
+ORCA must support one or many zones. Use a stable zoneId for every zone.
+Never rely only on array position. Never allow Zone 1 data to appear under
+Zone 2.
+
+NO FABRICATION
+==============
+Never invent environmental values, risk scores, confidence, timestamps,
+sources, or AI results. Missing data must be represented explicitly.
+
+SECRETS
+=======
+Never commit API keys, tokens, passwords, private credentials, or real .env
+files. Use .env.example for safe variable names/placeholders.
+
+GIT SAFETY
+==========
+Before changing shared contracts, communicate with Arpit.
+Keep commits focused on your owned area.
+Do not use force-push on shared branches unless explicitly coordinated.
+Do not rewrite another developer's commits.
+
+======================================================================
+BACKEND / INTEGRATION DEVELOPER INSTRUCTIONS — ARPIT
+======================================================================
+
+OWNERSHIP
+=========
+You own all repository areas except the Frontend/ and AI-Service/ folders.
+
+PRIMARY OWNERSHIP:
+- Backend/
+- GIS-Service/
+- Ecosystem-Service/
+- Data/
+- Docs/
+- Scripts/
+- .github/
+- root configuration files
+- service integration and deployment configuration
+
+IMPORTANT:
+Frontend developer owns Frontend/.
+AI developer owns AI-Service/.
+Do not modify their code directly unless the team explicitly agrees to an
+emergency integration fix. Prefer asking the relevant owner to make the change.
+
+BACKEND MISSION
+===============
+Backend is the central application server, API gateway, orchestration layer,
+integration layer and MongoDB persistence coordinator.
+
+Stack:
+- Node.js
+- Express
+- MongoDB
+- Mongoose or equivalent MongoDB driver
+
+BACKEND ARCHITECTURE
+====================
+HTTP Request
+ -> Middleware
+ -> Route
+ -> Controller
+ -> Service
+ -> Model / external service / AI
+ -> Response
+
+Do not put all logic in server.js.
+
+BACKEND STRUCTURE
+=================
+Backend/
+├── src/
+│   ├── routes/
+│   │   ├── analysis.routes.js
+│   │   ├── chat.routes.js
+│   │   ├── gis.routes.js
+│   │   ├── data.routes.js
+│   │   └── health.routes.js
+│   ├── controllers/
+│   │   ├── analysis.controller.js
+│   │   ├── chat.controller.js
+│   │   ├── gis.controller.js
+│   │   └── health.controller.js
+│   ├── services/
+│   │   ├── analysis.service.js
+│   │   ├── ai.service.js
+│   │   ├── gis.service.js
+│   │   ├── weather.service.js
+│   │   ├── ocean.service.js
+│   │   ├── ecosystem.service.js
+│   │   ├── conversation.service.js
+│   │   └── snapshot.service.js
+│   ├── models/
+│   │   ├── Analysis.js
+│   │   ├── Conversation.js
+│   │   ├── Message.js
+│   │   └── DataSnapshot.js
+│   ├── middleware/
+│   │   ├── error.middleware.js
+│   │   ├── validation.middleware.js
+│   │   ├── request-id.middleware.js
+│   │   ├── rate-limit.middleware.js
+│   │   └── auth.middleware.js
+│   ├── config/
+│   │   ├── config.js
+│   │   └── database.js
+│   ├── utils/
+│   │   ├── logger.js
+│   │   ├── response.js
+│   │   ├── errors.js
+│   │   ├── fingerprint.js
+│   │   ├── units.js
+│   │   └── time.js
+│   └── server.js
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   ├── fixtures/
+│   └── helpers/
+├── docs/
+│   └── api-contract.md
+├── package.json
+├── .env
+├── .env.example
+└── README.md
+
+ANALYSIS API
+============
+Recommended endpoints:
+POST   /api/v1/analysis
+GET    /api/v1/analysis/:analysisId
+GET    /api/v1/analysis/:analysisId/status
+DELETE /api/v1/analysis/:analysisId
+
+Request concept:
+{
+  activity,
+  date,
+  time,
+  zones: [
+    {
+      zoneId,
+      latitude,
+      longitude
+    }
+  ]
+}
+
+Multi-zone is mandatory.
+A one-zone analysis is still zones = [Z1].
+
+CHAT API
+========
+Recommended:
+POST /api/v1/chat
+GET  /api/v1/conversations/:conversationId
+GET  /api/v1/conversations/:conversationId/messages
+
+Chat requests should preserve:
+- conversationId;
+- analysisId;
+- zoneId when applicable;
+- user message.
+
+GIS API
+=======
+Examples:
+POST /api/v1/gis/resolve
+POST /api/v1/gis/batch
+GET  /api/v1/gis/zone/:zoneId
+
+GIS-Service owns spatial processing.
+Backend validates/orchestrates but should not duplicate complex GIS logic.
+
+DATA API
+========
+Expose only explicit, controlled data operations.
+Never create an unrestricted URL proxy such as:
+GET /data?url=https://any-site.com
+
+HEALTH
+======
+GET /api/v1/health
+
+Health should report relevant service state without triggering expensive
+analysis requests.
+
+ANALYSIS SERVICE
+================
+analysis.service.js owns the complete lifecycle:
+
+request
+ -> validate/normalize
+ -> create analysis
+ -> process zones
+ -> GIS
+ -> weather/ocean/ecosystem
+ -> AI
+ -> store result
+ -> status completed/partial/failed
+ -> return
+
+Every zone must preserve:
+analysisId
+zoneId
+location
+data
+agent results
+risk
+decision
+
+Never depend only on array position.
+
+AI SERVICE BRIDGE
+=================
+ai.service.js is the Node -> Python bridge.
+
+It must:
+- build normalized AI request;
+- pass analysisId/zoneIds;
+- call configured AI endpoint;
+- enforce timeout;
+- retry only safe transient failures;
+- validate AI response;
+- normalize response;
+- return structured data.
+
+DO NOT duplicate LangGraph reasoning in Node.
+
+WEATHER SERVICE
+===============
+weather.service.js:
+- call configured weather provider;
+- pass coordinates/date/time;
+- normalize units;
+- normalize timestamps;
+- label forecast vs observation;
+- preserve source/quality;
+- handle upstream errors.
+
+OCEAN SERVICE
+=============
+ocean.service.js:
+- retrieve available marine variables;
+- normalize units/timestamps;
+- preserve source/provenance;
+- handle missing/unavailable fields honestly.
+
+ECOSYSTEM SERVICE
+=================
+ecosystem.service.js connects Backend to Ecosystem-Service.
+Do not spread Copernicus/provider-specific logic throughout Backend.
+
+CONVERSATION SERVICE
+====================
+conversation.service.js:
+- create/load conversation;
+- save user message;
+- associate analysisId;
+- associate zoneId;
+- call AI;
+- save assistant response;
+- retrieve history.
+
+SNAPSHOT SERVICE
+================
+snapshot.service.js preserves the environmental data used by an analysis.
+
+Conceptually:
+analysisId
+zoneId
+source
+variable
+value
+unit
+validAt
+retrievedAt
+dataType
+quality
+
+This supports reproducibility and provenance.
+
+MONGODB
+=======
+Collections conceptually:
+- analyses
+- conversations
+- messages
+- data_snapshots
+
+Analysis document should conceptually contain:
+analysisId
+status
+request
+zones[]
+overallDecision
+dataQuality
+agentTrace where appropriate
+timestamps
+
+Every zone contains its own:
+location
+gis
+weather
+ocean
+ecosystem
+risk
+recommendation
+
+Do not create a root-level single latitude/longitude design for final
+multi-zone architecture.
+
+PARTIAL FAILURES
+================
+If Zone 2 ecosystem data fails:
+- retain Zone 2;
+- set ecosystem unavailable/error;
+- preserve other successful data;
+- mark result partial/limited as appropriate;
+- communicate reduced confidence to AI/frontend.
+
+Do not discard all analysis data because one service failed.
+
+PROVENANCE
+==========
+Important environmental values should retain:
+- source;
+- timestamp;
+- variable;
+- unit;
+- forecast/observation;
+- quality/status.
+
+NO FABRICATION
+==============
+Backend must not fabricate marine values, GIS values, AI results or
+confidence values.
+
+If upstream data is unavailable, represent it explicitly.
+
+MIDDLEWARE
+==========
+request-id:
+- generate/propagate request ID.
+
+validation:
+- validate API body/params;
+- reject malformed coordinates;
+- validate zones[].
+
+rate-limit:
+- protect public endpoints.
+
+auth:
+- keep authorization boundaries ready without coupling domain logic.
+
+error.middleware:
+- standardize error responses;
+- never leak secrets/internal stack traces to clients.
+
+ROUTES
+======
+Routes should be thin:
+endpoint -> middleware -> controller
+
+Controllers should be thin:
+request -> service -> HTTP response
+
+Services contain business/integration logic.
+
+SERVER.JS
+=========
+server.js only bootstraps:
+- config;
+- Express;
+- JSON;
+- CORS;
+- middleware;
+- routes;
+- MongoDB;
+- error handling;
+- server start/shutdown.
+
+Do not put weather, AI, GIS, database queries or risk reasoning here.
+
+API CONTRACT
+============
+The API contract is a team boundary.
+
+Before changing a field:
+1. identify which consumer is affected;
+2. communicate with Frontend/AI owner;
+3. update the agreed contract/documentation;
+4. preserve backward compatibility when practical;
+5. test both sides.
+
+Do not silently rename fields used by another developer.
+
+FRONTEND CONTRACT
+=================
+Frontend only needs stable structured results such as:
+zone
+weather
+ocean
+ecosystem
+risk
+decision
+confidence
+evidence
+agent status
+
+Frontend must not need to know LangGraph internals.
+
+AI CONTRACT
+===========
+AI should receive normalized structured data and return structured reasoning.
+Backend owns transport, validation, persistence and integration.
+
+DATA + SCHEMAS
+==============
+Data/
+├── sample/
+│   ├── weather/
+│   ├── ocean/
+│   ├── ecosystem/
+│   └── gis/
+├── processed/
+│   ├── weather/
+│   ├── ocean/
+│   ├── ecosystem/
+│   └── gis/
+└── schemas/
+    ├── analysis.schema.json
+    ├── weather.schema.json
+    ├── ocean.schema.json
+    ├── ecosystem.schema.json
+    ├── gis.schema.json
+    └── chat.schema.json
+
+Data is for safe sample/processed data and schemas, not production MongoDB
+replacement.
+
+Do not commit:
+- credentials;
+- secrets;
+- enormous unnecessary raw datasets;
+- private API responses containing secrets.
+
+GIS-SERVICE
+===========
+Own:
+- coordinate validation/processing;
+- spatial calculations;
+- coast distance;
+- water depth where available;
+- nearest port;
+- marine-zone context;
+- multi-coordinate spatial operations.
+
+Keep it isolated from AI/chat logic.
+
+ECOSYSTEM-SERVICE
+=================
+Own:
+- ecosystem data retrieval;
+- provider-specific implementation;
+- normalization.
+
+Keep Copernicus/provider-specific details inside this service.
+
+SCRIPTS
+=======
+Scripts/
+- start-all.js
+- health-check.js
+- seed-demo-data.js
+
+Scripts may coordinate services but must not become a dumping ground for
+business logic.
+
+DOCS
+====
+Maintain:
+Docs/architecture.md
+Docs/api-contract.md
+Docs/agent-design.md
+Docs/data-sources.md
+Docs/backend.md
+Docs/frontend.md
+Docs/chatbot.md
+Docs/mongodb.md
+Docs/deployment.md
+Docs/testing.md
+
+When a contract changes, update the relevant documentation.
+
+GIT / INTEGRATION
+=================
+You are the integration owner.
+
+Before merging frontend/AI work:
+- inspect changed files;
+- verify ownership boundaries;
+- run relevant tests;
+- verify API contracts;
+- verify multi-zone behavior;
+- verify no secrets are committed;
+- verify service health.
+
+Do not solve ownership violations by moving another developer's code.
+
+BACKEND DEFINITION OF DONE
+==========================
+- API starts.
+- MongoDB connection works.
+- Health endpoint works.
+- Analysis API works.
+- Multi-zone analysis works.
+- Zone IDs remain stable end-to-end.
+- Weather/ocean/ecosystem/GIS integrations work or fail explicitly.
+- AI bridge works.
+- Results persist.
+- Chat persistence works.
+- Partial failures are handled.
+- Provenance/snapshots are retained where required.
+- Errors are standardized.
+- Tests cover critical paths.
+- No secrets committed.
+- No AI reasoning duplicated in Node.
+- Frontend and AI contracts are stable.

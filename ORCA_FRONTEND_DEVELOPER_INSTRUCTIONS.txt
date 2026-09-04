@@ -1,0 +1,463 @@
+ORCA — TEAM DEVELOPMENT RULES
+Project: SIH26176 — ORCA: Marine EcOsystem Reasoning with Collaborative Agents
+
+NON-NEGOTIABLE REPOSITORY OWNERSHIP
+===================================
+This repository is intentionally divided between three developers:
+
+1. FRONTEND DEVELOPER
+   Owns ONLY: Frontend/
+
+2. AI DEVELOPER
+   Owns ONLY: AI-Service/
+
+3. BACKEND / INTEGRATION DEVELOPER (Arpit)
+   Owns the remaining project areas:
+   Backend/
+   GIS-Service/
+   Ecosystem-Service/
+   Data/
+   Docs/
+   Scripts/
+   .github/
+   root configuration files
+
+STRICT RULE:
+- Frontend developer must not modify Backend, AI-Service, GIS-Service,
+  Ecosystem-Service, Data, Docs, Scripts, .github, or root files.
+- AI developer must not modify Frontend, Backend, GIS-Service,
+  Ecosystem-Service, Data, Docs, Scripts, .github, or root files.
+- Backend developer owns all remaining folders/files and handles integration.
+- Do NOT move files between ownership areas.
+- Do NOT create duplicate folders outside the defined architecture.
+- If a change appears necessary outside your owned folder, STOP and tell Arpit.
+- Never "temporarily" edit another developer's files.
+- Never bypass this rule because it seems faster.
+
+COMMUNICATION BOUNDARY
+======================
+Frontend -> Backend API -> internal services / AI
+Backend -> AI-Service through the agreed API contract
+AI-Service -> returns structured reasoning/results
+Frontend never calls AI directly.
+
+The repository architecture is designed around clear responsibility:
+Frontend = presentation
+Backend = API/orchestration/persistence
+AI-Service = reasoning
+GIS-Service = spatial processing
+Ecosystem-Service = ecosystem data retrieval
+
+MULTI-ZONE IS MANDATORY
+=======================
+ORCA must support one or many zones. Use a stable zoneId for every zone.
+Never rely only on array position. Never allow Zone 1 data to appear under
+Zone 2.
+
+NO FABRICATION
+==============
+Never invent environmental values, risk scores, confidence, timestamps,
+sources, or AI results. Missing data must be represented explicitly.
+
+SECRETS
+=======
+Never commit API keys, tokens, passwords, private credentials, or real .env
+files. Use .env.example for safe variable names/placeholders.
+
+GIT SAFETY
+==========
+Before changing shared contracts, communicate with Arpit.
+Keep commits focused on your owned area.
+Do not use force-push on shared branches unless explicitly coordinated.
+Do not rewrite another developer's commits.
+
+======================================================================
+FRONTEND DEVELOPER INSTRUCTIONS
+======================================================================
+
+OWNERSHIP
+=========
+You may edit ONLY:
+
+Frontend/
+
+You may create/update/delete files only inside Frontend/.
+Do not edit anything outside Frontend/.
+
+If you discover that a backend response is missing a field:
+- Do NOT edit Backend.
+- Report the required field/contract change to Arpit.
+- Continue using a clearly documented mock/fixture only if it already belongs
+  inside Frontend and does not misrepresent live data.
+
+FRONTEND MISSION
+================
+Build the ORCA user-facing marine intelligence and decision-support UI.
+
+The frontend must let users:
+- understand ORCA;
+- select an activity;
+- enter one or multiple marine zones;
+- start an analysis;
+- view zones on a map;
+- inspect weather, ocean, ecosystem, GIS, risk and decision information;
+- see the five AI agent statuses;
+- compare zones;
+- view confidence/data-quality/provenance information;
+- use the analysis-aware chatbot;
+- handle loading, partial, empty and error states.
+
+ARCHITECTURE
+============
+Recommended frontend stack:
+- React
+- JSX/JavaScript or the existing TypeScript setup
+- Vite
+- Tailwind CSS / existing project styling
+- Leaflet / React-Leaflet
+- Recharts
+- Fetch or Axios
+- React hooks
+
+DO NOT introduce a major framework migration without coordination.
+
+FOLDER STRUCTURE — FOLLOW EXACTLY
+=================================
+Frontend/
+├── public/
+│   ├── assets/
+│   └── icons/
+├── src/
+│   ├── components/
+│   │   ├── Navbar.jsx
+│   │   ├── Sidebar.jsx
+│   │   ├── ChatBox.jsx
+│   │   ├── MapView.jsx
+│   │   ├── AnalysisPanel.jsx
+│   │   ├── RiskCard.jsx
+│   │   ├── WeatherCard.jsx
+│   │   ├── OceanCard.jsx
+│   │   ├── EcosystemCard.jsx
+│   │   ├── AgentStatus.jsx
+│   │   └── DecisionPanel.jsx
+│   ├── pages/
+│   │   ├── Landing.jsx
+│   │   ├── Analysis.jsx
+│   │   └── Dashboard.jsx
+│   ├── services/
+│   │   └── api.js
+│   ├── hooks/
+│   │   └── useAnalysis.js
+│   ├── utils/
+│   │   └── helpers.js
+│   ├── App.jsx
+│   ├── main.jsx
+│   └── index.css
+├── package.json
+├── vite.config.js
+└── README.md
+
+Do not create random folders such as:
+components-new/
+components2/
+api-final/
+backend-api/
+ai/
+server/
+data/
+inside Frontend/.
+
+If more frontend structure is genuinely required, discuss it before creating
+a new architectural directory.
+
+FILE RESPONSIBILITIES
+=====================
+
+1. public/assets/
+   Static visual assets: logo, backgrounds, illustrations, map assets.
+   Do not put application logic here.
+
+2. public/icons/
+   Reusable weather, ocean, ecosystem, risk, agent and navigation icons.
+
+3. src/components/Navbar.jsx
+   - branding;
+   - navigation/header;
+   - analysis context;
+   - system status;
+   - mobile menu.
+   MUST NOT fetch marine data or perform AI/risk/GIS logic.
+
+4. src/components/Sidebar.jsx
+   - navigation;
+   - current analysis summary;
+   - filters/layers/navigation.
+   Do not own the complete application state.
+
+5. src/components/ChatBox.jsx
+   - render conversation;
+   - collect user question;
+   - call the frontend API layer.
+   It must never call an LLM directly.
+
+6. src/components/MapView.jsx
+   - render Leaflet map;
+   - render one/multiple zones;
+   - markers;
+   - selection;
+   - optional GIS/risk overlays;
+   - map controls/legend.
+   Every marker must retain zoneId.
+   Clicking a marker must update selectedZoneId.
+
+7. src/components/AnalysisPanel.jsx
+   - activity;
+   - date/time;
+   - add/edit/remove zones;
+   - selected zone summary;
+   - submit/re-run controls.
+   Multi-zone input is required.
+
+8. src/components/RiskCard.jsx
+   Display supplied risk level/score/factors.
+   NEVER calculate or invent risk.
+
+9. src/components/WeatherCard.jsx
+   Display supplied weather values, timestamps, forecast/observation status,
+   source/quality where available.
+   NEVER invent missing weather data.
+
+10. src/components/OceanCard.jsx
+    Display supplied ocean conditions.
+    Scientific transformations belong outside the UI unless purely display
+    formatting.
+
+11. src/components/EcosystemCard.jsx
+    Display supplied ecosystem information.
+    Missing ecosystem data must be shown honestly.
+
+12. src/components/AgentStatus.jsx
+    Display:
+    - Weather
+    - Ocean
+    - Ecosystem
+    - Risk
+    - Decision
+    Supported statuses:
+    idle, queued, running, completed, failed, partial.
+    Do not execute agent logic.
+
+13. src/components/DecisionPanel.jsx
+    Display final recommendation, confidence, reasons/evidence, data quality,
+    and recommended action.
+    Do not expose private chain-of-thought.
+    Show concise evidence instead.
+
+14. src/pages/Landing.jsx
+    Explain ORCA and provide Start Analysis.
+
+15. src/pages/Analysis.jsx
+    Build the analysis request and support multiple zones.
+
+16. src/pages/Dashboard.jsx
+    Compose the main results screen:
+    Navbar + Sidebar + Map + data cards + Risk + Decision + AgentStatus + Chat.
+
+17. src/services/api.js
+    Centralize frontend API communication.
+    Typical operations:
+    - createAnalysis()
+    - getAnalysis()
+    - getAnalysisStatus()
+    - sendChatMessage()
+    - getGISData()
+    Do not scatter raw fetch/axios calls throughout components.
+
+18. src/hooks/useAnalysis.js
+    Own frontend analysis lifecycle:
+    request -> status polling -> result -> UI state.
+    Stop polling when completed, failed, or unmounted.
+
+19. src/utils/helpers.js
+    Only small UI/display helpers:
+    - formatting;
+    - labels;
+    - dates;
+    - coordinates;
+    - safe display.
+    Do not put scientific/domain reasoning here.
+
+20. App.jsx
+    Routing and application-level composition.
+
+21. main.jsx
+    React entry point.
+
+22. index.css
+    Global styles, typography, map styling, CSS variables if applicable.
+
+23. package.json
+    Frontend dependencies/scripts only.
+    Do not add backend/AI dependencies.
+
+24. vite.config.js
+    Vite/frontend configuration only.
+
+25. README.md
+    Frontend setup, run/build, environment configuration, folder ownership,
+    API integration and conventions.
+
+UI DESIGN REQUIREMENTS
+=======================
+ORCA should look like a modern marine intelligence dashboard:
+- dark marine visual language where consistent with the existing prototype;
+- deep ocean tones;
+- cyan/teal intelligence accents;
+- clear risk hierarchy;
+- readable typography;
+- high information density without clutter;
+- restrained effects.
+
+Priority on the dashboard:
+1. Decision
+2. Risk
+3. Zone
+4. Environmental conditions
+5. Agent status
+6. Evidence/data quality
+
+MAP-FIRST + DECISION-FIRST
+==========================
+Dashboard should make these questions obvious:
+WHAT IS THE ZONE?
+WHAT IS HAPPENING THERE?
+WHAT IS THE RISK?
+WHY?
+WHAT DOES ORCA RECOMMEND?
+HOW CONFIDENT IS ORCA?
+
+MULTI-ZONE DATA MODEL
+=====================
+Use a structure conceptually like:
+
+{
+  activity,
+  date,
+  time,
+  zones: [
+    {
+      zoneId,
+      name,
+      latitude,
+      longitude
+    }
+  ]
+}
+
+Every result must preserve zoneId.
+
+Preferred selection:
+result.zones.find(zone => zone.zoneId === selectedZoneId)
+
+Avoid:
+result.zones[0]
+
+When selectedZoneId changes, update:
+- map selection;
+- weather;
+- ocean;
+- ecosystem;
+- risk;
+- decision.
+
+API BOUNDARY
+============
+Frontend talks to Backend only.
+
+Correct:
+Frontend -> api.js -> Backend -> services -> AI/GIS/data
+
+Wrong:
+Frontend -> Python AI
+Frontend -> OpenAI/LLM
+Frontend -> Copernicus
+Frontend -> weather provider directly
+Frontend -> GIS implementation directly
+
+Do not place secrets in Vite client-side variables unless the value is
+explicitly safe for public exposure. API keys belong on the backend.
+
+ERROR + MISSING DATA
+====================
+Implement:
+- loading;
+- empty;
+- failed;
+- partial;
+- unavailable;
+- retry where appropriate.
+
+Example:
+"Ecosystem data unavailable"
+is better than displaying a fake value.
+
+If one card fails, the whole dashboard should ideally remain usable.
+
+DEMO MODE
+=========
+If demo mode already exists, keep it clearly separate from live mode.
+Demo data must be visibly/architecturally distinguishable from live data.
+Never present demo/fake scientific values as live observations.
+
+PERFORMANCE
+===========
+- avoid unnecessary map re-renders;
+- memoize expensive chart calculations;
+- clean polling timers;
+- do not load huge datasets into the browser;
+- avoid hundreds of unnecessary map markers;
+- lazy-load heavy UI where appropriate.
+
+TESTING
+=======
+At minimum test:
+- Landing;
+- Analysis;
+- Dashboard;
+- RiskCard;
+- WeatherCard;
+- OceanCard;
+- EcosystemCard;
+- DecisionPanel;
+- create analysis;
+- multiple zones;
+- select zone;
+- result rendering;
+- chat.
+
+Critical multi-zone tests:
+- 1 zone;
+- 2 zones;
+- >2 zones;
+- duplicate coordinates with different zoneIds;
+- selecting Zone 2 updates every zone-specific card.
+
+DEFINITION OF DONE
+==================
+- Frontend starts successfully.
+- Production build succeeds.
+- Routing works.
+- Analysis form works.
+- Multiple zones work.
+- Latitude/longitude validation works.
+- Zone edit/remove works.
+- API integration works through api.js.
+- Dashboard renders real structured backend data.
+- Map selection works.
+- Agent statuses render.
+- Risk and decision render supplied values only.
+- Chat uses Backend.
+- Loading/error/partial states work.
+- Polling is cleaned up.
+- No secrets are exposed.
+- No files outside Frontend/ were modified.

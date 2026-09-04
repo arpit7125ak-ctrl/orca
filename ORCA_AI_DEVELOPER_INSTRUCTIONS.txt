@@ -1,0 +1,532 @@
+ORCA — TEAM DEVELOPMENT RULES
+Project: SIH26176 — ORCA: Marine EcOsystem Reasoning with Collaborative Agents
+
+NON-NEGOTIABLE REPOSITORY OWNERSHIP
+===================================
+This repository is intentionally divided between three developers:
+
+1. FRONTEND DEVELOPER
+   Owns ONLY: Frontend/
+
+2. AI DEVELOPER
+   Owns ONLY: AI-Service/
+
+3. BACKEND / INTEGRATION DEVELOPER (Arpit)
+   Owns the remaining project areas:
+   Backend/
+   GIS-Service/
+   Ecosystem-Service/
+   Data/
+   Docs/
+   Scripts/
+   .github/
+   root configuration files
+
+STRICT RULE:
+- Frontend developer must not modify Backend, AI-Service, GIS-Service,
+  Ecosystem-Service, Data, Docs, Scripts, .github, or root files.
+- AI developer must not modify Frontend, Backend, GIS-Service,
+  Ecosystem-Service, Data, Docs, Scripts, .github, or root files.
+- Backend developer owns all remaining folders/files and handles integration.
+- Do NOT move files between ownership areas.
+- Do NOT create duplicate folders outside the defined architecture.
+- If a change appears necessary outside your owned folder, STOP and tell Arpit.
+- Never "temporarily" edit another developer's files.
+- Never bypass this rule because it seems faster.
+
+COMMUNICATION BOUNDARY
+======================
+Frontend -> Backend API -> internal services / AI
+Backend -> AI-Service through the agreed API contract
+AI-Service -> returns structured reasoning/results
+Frontend never calls AI directly.
+
+The repository architecture is designed around clear responsibility:
+Frontend = presentation
+Backend = API/orchestration/persistence
+AI-Service = reasoning
+GIS-Service = spatial processing
+Ecosystem-Service = ecosystem data retrieval
+
+MULTI-ZONE IS MANDATORY
+=======================
+ORCA must support one or many zones. Use a stable zoneId for every zone.
+Never rely only on array position. Never allow Zone 1 data to appear under
+Zone 2.
+
+NO FABRICATION
+==============
+Never invent environmental values, risk scores, confidence, timestamps,
+sources, or AI results. Missing data must be represented explicitly.
+
+SECRETS
+=======
+Never commit API keys, tokens, passwords, private credentials, or real .env
+files. Use .env.example for safe variable names/placeholders.
+
+GIT SAFETY
+==========
+Before changing shared contracts, communicate with Arpit.
+Keep commits focused on your owned area.
+Do not use force-push on shared branches unless explicitly coordinated.
+Do not rewrite another developer's commits.
+
+======================================================================
+AI DEVELOPER INSTRUCTIONS
+======================================================================
+
+OWNERSHIP
+=========
+You may edit ONLY:
+
+AI-Service/
+
+You may create/update/delete files only inside AI-Service/.
+Do not edit anything outside AI-Service/.
+
+If the Backend contract must change:
+- STOP.
+- Tell Arpit exactly what field/endpoint/contract change is needed.
+- Do not edit Backend yourself.
+
+AI MISSION
+==========
+Build ORCA's controlled collaborative reasoning system using Python and
+LangGraph.
+
+The AI-Service owns:
+- Weather Agent
+- Ocean Agent
+- Ecosystem Agent
+- Risk Agent
+- Decision Agent
+- LangGraph orchestration
+- chatbot reasoning
+- explanation generation
+- AI prompts
+- structured AI response validation
+
+The AI-Service must NOT become the general database or frontend server.
+
+FOLDER STRUCTURE — FOLLOW EXACTLY
+=================================
+AI-Service/
+├── agents/
+│   ├── weather_agent.py
+│   ├── ocean_agent.py
+│   ├── ecosystem_agent.py
+│   ├── risk_agent.py
+│   └── decision_agent.py
+├── graph/
+│   ├── workflow.py
+│   ├── state.py
+│   └── nodes.py
+├── chains/
+│   ├── weather_chain.py
+│   ├── ocean_chain.py
+│   ├── ecosystem_chain.py
+│   ├── risk_chain.py
+│   └── decision_chain.py
+├── chat/
+│   ├── __init__.py
+│   ├── workflow.py
+│   ├── state.py
+│   ├── router.py
+│   ├── memory.py
+│   ├── context.py
+│   ├── response.py
+│   └── prompts.py
+├── tools/
+│   ├── weather_tool.py
+│   ├── ocean_tool.py
+│   ├── ecosystem_tool.py
+│   └── gis_tool.py
+├── services/
+│   ├── weather_service.py
+│   ├── ocean_service.py
+│   ├── ecosystem_service.py
+│   └── gis_service.py
+├── prompts/
+│   ├── weather_prompt.txt
+│   ├── ocean_prompt.txt
+│   ├── ecosystem_prompt.txt
+│   ├── risk_prompt.txt
+│   └── decision_prompt.txt
+├── models/
+│   └── schemas.py
+├── utils/
+│   └── helpers.py
+├── app.py
+├── requirements.txt
+├── .env
+├── .env.example
+└── README.md
+
+Do not create parallel folders such as:
+agents2/, graph-new/, prompts-final/, llm/, backend/, frontend/
+without architectural approval.
+
+AGENT RESPONSIBILITIES
+======================
+
+1. weather_agent.py
+   Interpret supplied weather evidence:
+   - temperature;
+   - wind speed/direction;
+   - precipitation;
+   - visibility;
+   - pressure;
+   - forecast/observation status;
+   - timestamps;
+   - quality.
+   Return structured assessment and evidence.
+
+2. ocean_agent.py
+   Interpret supplied marine evidence:
+   - wave height;
+   - wave period/direction;
+   - current;
+   - tide;
+   - SST;
+   - sea state;
+   - depth where available.
+   Do not invent variables that the input does not contain.
+
+3. ecosystem_agent.py
+   Interpret supplied ecosystem/environmental evidence:
+   - ecosystem condition;
+   - sensitivity;
+   - biodiversity indicators;
+   - chlorophyll/productivity when available;
+   - habitat;
+   - protected/sensitive areas;
+   - ecological constraints.
+   Missing data remains missing.
+
+4. risk_agent.py
+   Combine evidence from domain agents and estimate structured risk.
+   It must consume evidence; it must not invent raw measurements.
+   Risk should be traceable to supplied factors.
+
+5. decision_agent.py
+   Produce the final recommendation.
+   For multiple zones:
+   Zone 1 -> assessment
+   Zone 2 -> assessment
+   Zone N -> assessment
+             -> compare
+             -> recommendation
+
+   Return:
+   - recommendation;
+   - key reasons;
+   - confidence where supported;
+   - evidence;
+   - data-quality limitations.
+   Do not expose hidden chain-of-thought.
+
+LANGGRAPH
+=========
+graph/workflow.py:
+Define the overall workflow.
+
+Conceptual:
+START
+ -> Weather
+ -> Ocean
+ -> Ecosystem
+ -> Risk
+ -> Decision
+ -> END
+
+Multi-zone execution may be sequential or parallel where practical, but
+zone identity must survive every node.
+
+graph/state.py:
+Maintain shared state such as:
+- analysis_id
+- request
+- zones
+- zone_results
+- weather_results
+- ocean_results
+- ecosystem_results
+- risk_results
+- decision
+- errors
+
+Every zone result must be associated with zoneId.
+
+graph/nodes.py:
+Connect agent/tool functions to graph nodes and keep workflow.py clean.
+
+CHAINS
+======
+chains/ contains domain-specific prompt/model execution when useful:
+- weather_chain.py
+- ocean_chain.py
+- ecosystem_chain.py
+- risk_chain.py
+- decision_chain.py
+
+Do not duplicate the same reasoning implementation across agent and chain
+files. Keep one clear ownership path.
+
+CHAT
+====
+Chat is a dedicated conversational workflow.
+
+chat/state.py should preserve:
+- conversation_id
+- analysis_id
+- current_zone
+- history/context
+- user_question
+- answer
+
+chat/router.py:
+Determine the relevant context:
+"What is the wind?" -> weather
+"Why is Zone 2 risky?" -> risk/decision
+"Compare Zone 1 and Zone 3." -> cross-zone decision context
+
+chat/memory.py:
+Manage conversation memory.
+
+chat/context.py:
+Build context from the selected analysis/zone.
+
+chat/response.py:
+Validate and format the final response.
+
+chat/prompts.py:
+Chat-specific prompt construction.
+
+Chat MUST NOT mix data between zones.
+
+TOOLS
+=====
+tools/ are AI-callable tools where tool-based retrieval is actually required.
+Keep tool implementations small and explicit.
+
+weather_tool.py -> weather information
+ocean_tool.py -> ocean information
+ecosystem_tool.py -> ecosystem information
+gis_tool.py -> spatial information such as classification/distances
+
+Do not create direct uncontrolled external API access from arbitrary user input.
+
+SERVICES
+========
+services/ are adapters:
+weather_service.py
+ocean_service.py
+ecosystem_service.py
+gis_service.py
+
+Keep provider-specific details behind service interfaces.
+Do not spread provider-specific implementation through agents.
+
+PROMPTS
+=======
+prompts/ contains domain prompts.
+
+Prompts must define:
+- role;
+- allowed inputs;
+- expected structured output;
+- uncertainty behavior;
+- missing-data behavior;
+- no-fabrication rule;
+- safety/decision limitations.
+
+Do not put secrets in prompts.
+
+SCHEMAS
+=======
+models/schemas.py is the AI structured-contract boundary.
+
+Validate:
+- request input;
+- zoneId;
+- zone results;
+- risk;
+- decision;
+- confidence;
+- evidence;
+- errors/partial states.
+
+Prefer explicit enums/structured objects over uncontrolled text where possible.
+
+MULTI-ZONE REQUIREMENT
+======================
+Every AI request must support:
+zones: []
+
+Even one coordinate is:
+zones = [Z1]
+
+Never identify a zone only by list position.
+
+Every agent output should preserve:
+analysisId
+zoneId
+
+Example conceptual result:
+{
+  "zoneId": "Z2",
+  "weather": {...},
+  "ocean": {...},
+  "ecosystem": {...},
+  "risk": {...},
+  "decision": {...}
+}
+
+PARTIAL FAILURE
+================
+If ecosystem fails for Zone 2:
+- do not erase Zone 2;
+- mark ecosystem unavailable/failed;
+- reduce/qualify confidence if appropriate;
+- let the final decision communicate the limitation;
+- preserve successful weather/ocean evidence.
+
+Do not turn a partial failure into fabricated completeness.
+
+DATA QUALITY + PROVENANCE
+=========================
+Propagate:
+- source;
+- timestamp;
+- variable;
+- unit;
+- forecast/observation;
+- quality/status.
+
+The AI must distinguish:
+observed
+forecast
+missing
+unavailable
+stale/low-quality where supplied.
+
+NO FABRICATION
+==============
+The AI must NEVER invent:
+- weather measurements;
+- ocean measurements;
+- ecosystem measurements;
+- source names;
+- timestamps;
+- sensor readings;
+- GIS values;
+- confidence as if statistically established.
+
+If evidence is insufficient, say so in the structured output.
+
+CONFIDENCE
+==========
+Confidence must reflect evidence quality and completeness.
+Do not output false precision merely because the LLM can produce a number.
+
+DECISION OUTPUT
+===============
+The decision should be concise and auditable through evidence:
+- recommendation;
+- key factors;
+- confidence;
+- data-quality limitations;
+- zone comparison if multiple zones.
+
+Never expose private chain-of-thought. Return summarized reasons/evidence.
+
+PROMPT-INJECTION BOUNDARY
+==========================
+Treat user chat content as untrusted input.
+Do not allow a user question to override system/developer rules, schema
+requirements, no-fabrication rules, or security constraints.
+
+SECURITY
+========
+- no secrets in source code;
+- no API keys in prompts;
+- no credentials in returned responses;
+- use environment variables;
+- keep .env local;
+- keep .env.example safe.
+
+API SERVICE
+===========
+app.py is the AI-Service entry point (FastAPI if that is the agreed setup).
+
+It should:
+- expose the AI API;
+- validate request;
+- invoke workflow;
+- return structured response;
+- handle errors;
+- expose basic health information if defined by the contract.
+
+Do not put all agent logic in app.py.
+
+REQUIREMENTS
+============
+requirements.txt contains Python dependencies required by AI-Service only.
+Keep dependencies minimal and pinned/controlled where practical.
+
+README
+======
+README.md must document:
+- setup;
+- Python environment;
+- dependencies;
+- run command;
+- API endpoint;
+- input/output contract;
+- agent responsibilities;
+- LangGraph flow;
+- multi-zone behavior;
+- environment variables;
+- testing.
+
+TESTING
+=======
+At minimum test:
+- input validation;
+- Weather Agent;
+- Ocean Agent;
+- Ecosystem Agent;
+- Risk Agent;
+- Decision Agent;
+- LangGraph workflow;
+- one-zone request;
+- two-zone request;
+- many-zone request;
+- zone identity preservation;
+- partial failure;
+- missing data;
+- structured output validation;
+- chatbot analysis/zone context;
+- prompt injection boundary.
+
+DEFINITION OF DONE
+==================
+- FastAPI service starts.
+- Backend can call AI-Service.
+- Input schema validates.
+- Multi-zone works.
+- Every zone has stable zoneId.
+- All five agents work.
+- LangGraph workflow works.
+- Agent state preserves zone identity.
+- Outputs are schema validated.
+- Missing data is explicit.
+- No environmental measurements are fabricated.
+- Data quality is propagated.
+- Confidence is handled appropriately.
+- Chat references analysis and selected zone correctly.
+- Chat does not mix zones.
+- Secrets are protected.
+- Basic agent/multi-zone/partial-failure tests exist.
+- API contract matches Backend.
+- No files outside AI-Service/ were modified.
