@@ -1,0 +1,2469 @@
+ORCA — COMPLETE END-TO-END BACKEND TECHNICAL AUDIT
+
+Project: SIH26176 — ORCA: Marine EcOsystem Reasoning with Collaborative
+Agents Audit date: 2026-09-04
+
+SCOPE AND STATUS LEGEND
+
+This document consolidates the backend and integration work developed
+across the ORCA project conversations. It records concrete files,
+functions, API contracts, configurations, external integrations, tests,
+observed failures, and unfinished work.
+
+Status labels: [IMPLEMENTED] = code was created. [TESTED] = behavior was
+exercised in the conversations. [PARTIAL] = implemented but not fully
+verified or incomplete. [PLANNED] = required by the architecture but not
+completed. [KNOWN GAP] = currently differs from the intended final
+architecture.
+
+The authoritative ORCA team rules define: - Frontend/ as the Frontend
+developer’s ownership area. - AI-Service/ as the AI developer’s
+ownership area. - Backend/, GIS-Service/, Ecosystem-Service/, Data/,
+Docs/, Scripts/, .github/, root configuration, and
+integration/deployment as Arpit’s Backend/Integration ownership. -
+Frontend -> Backend API -> internal services/AI. - Backend -> AI-Service
+through an agreed contract. - Frontend never calls AI directly. -
+Backend = API/orchestration/persistence. - AI-Service = reasoning. -
+GIS-Service = spatial processing. - Ecosystem-Service = ecosystem
+retrieval. - Multi-zone is mandatory and stable zoneId must be
+preserved. - Environmental values, risk, confidence, timestamps,
+sources, and AI results must never be fabricated. - Missing data must be
+explicitly represented. - Partial failures must preserve successful
+data.
+
+==================================================================== 1.
+SYSTEM ARCHITECTURE & TECH STACK
+====================================================================
+
+1.1 PRIMARY ARCHITECTURE
+
+The backend is the central application server, API gateway,
+orchestration layer, integration layer, and MongoDB persistence
+coordinator.
+
+Required flow:
+
+    HTTP Request
+        ->
+    Middleware
+        ->
+    Route
+        ->
+    Controller
+        ->
+    Service
+        ->
+    Model / External Service / AI
+        ->
+    HTTP Response
+
+The design deliberately avoids putting domain logic into server.js.
+
+Responsibility split:
+
+    Frontend
+        Presentation / map / dashboard / charts / user interaction
+
+    Backend
+        API
+        validation
+        orchestration
+        persistence
+        snapshots
+        integration
+        standardized errors
+        AI transport bridge
+        chat persistence
+
+    AI-Service
+        reasoning / agents / LangGraph workflow
+
+    GIS-Service
+        coordinate and spatial processing
+
+    Ecosystem-Service
+        ecosystem data retrieval / provider-specific normalization
+
+1.2 RUNTIME, LANGUAGE, FRAMEWORK
+
+Runtime: Node.js
+
+Language: JavaScript using CommonJS require/module.exports
+
+HTTP framework: Express 4.x
+
+Database: MongoDB
+
+ODM: Mongoose 8.x
+
+No TypeScript backend implementation was created in this work sequence.
+
+1.3 DEPENDENCIES
+
+Backend/package.json:
+
+    express ^4.21.2
+    mongoose ^8.9.5
+    cors ^2.8.5
+    dotenv ^16.4.5
+
+Development dependencies:
+
+    jest ^29.7.0
+    nodemon ^3.1.9
+    supertest ^7.0.0
+
+Scripts:
+
+    npm start
+        -> node src/server.js
+
+    npm run dev
+        -> nodemon src/server.js
+
+    npm test
+        -> jest
+
+The backend uses Node’s built-in fetch and AbortController for external
+HTTP calls. Axios was not added.
+
+1.4 DIRECTORY STRUCTURE
+
+Intended core structure:
+
+    Backend/
+    ├── src/
+    │   ├── routes/
+    │   │   ├── analysis.routes.js
+    │   │   ├── chat.routes.js
+    │   │   ├── gis.routes.js
+    │   │   ├── data.routes.js
+    │   │   └── health.routes.js
+    │   │
+    │   ├── controllers/
+    │   │   ├── analysis.controller.js
+    │   │   ├── chat.controller.js
+    │   │   ├── gis.controller.js
+    │   │   └── health.controller.js
+    │   │
+    │   ├── services/
+    │   │   ├── analysis.service.js
+    │   │   ├── ai.service.js
+    │   │   ├── gis.service.js
+    │   │   ├── weather.service.js
+    │   │   ├── ocean.service.js
+    │   │   ├── ecosystem.service.js
+    │   │   ├── conversation.service.js
+    │   │   └── snapshot.service.js
+    │   │
+    │   ├── models/
+    │   │   ├── Analysis.js
+    │   │   ├── Conversation.js
+    │   │   ├── Message.js
+    │   │   └── DataSnapshot.js
+    │   │
+    │   ├── middleware/
+    │   │   ├── error.middleware.js
+    │   │   ├── validation.middleware.js
+    │   │   ├── request-id.middleware.js
+    │   │   ├── rate-limit.middleware.js
+    │   │   └── auth.middleware.js
+    │   │
+    │   ├── config/
+    │   │   ├── config.js
+    │   │   └── database.js
+    │   │
+    │   ├── utils/
+    │   │   ├── logger.js
+    │   │   ├── response.js
+    │   │   ├── errors.js
+    │   │   ├── fingerprint.js
+    │   │   ├── units.js
+    │   │   └── time.js
+    │   │
+    │   └── server.js
+    │
+    ├── tests/
+    │   ├── unit/
+    │   ├── integration/
+    │   ├── fixtures/
+    │   └── helpers/
+    │
+    ├── docs/
+    │   └── api-contract.md
+    ├── package.json
+    ├── .env
+    ├── .env.example
+    └── README.md
+
+Additional direct-service routes/controllers were added during
+development: ocean.routes.js / ocean.controller.js ecosystem.routes.js /
+ecosystem.controller.js data.controller.js
+
+The broader project rules also specify Data/, Docs/, Scripts/, and
+.github/ ownership. Their detailed production contents were not all
+implemented in the conversation sequence.
+
+1.5 SERVER BOOTSTRAP
+
+File: Backend/src/server.js
+
+Responsibilities implemented: - require Express; - configure CORS; -
+configure JSON parsing; - attach request-ID middleware; - attach rate
+limiter; - register routes; - connect MongoDB; - start HTTP listener; -
+attach error middleware.
+
+Current route mounts:
+
+    /api/v1/health
+    /api/v1/analysis
+    /api/v1/gis
+    /api/v1/ocean
+    /api/v1/ecosystem
+    /api/v1/chat
+    /api/v1/data
+
+The intended rule is that server.js only bootstraps. It must not contain
+weather logic, GIS calculations, AI reasoning, or application database
+queries.
+
+==================================================================== 2.
+DATABASE DESIGN & DATA MODELS
+====================================================================
+
+2.1 MONGODB
+
+Connection: mongodb://localhost:27017/orca
+
+Connection module: Backend/src/config/database.js
+
+Functions: connectDatabase() disconnectDatabase()
+
+connectDatabase calls:
+
+    mongoose.connect(config.database.mongodbUri)
+
+Failure behavior: log error process.exit(1)
+
+Success log: MongoDB connected successfully
+
+2.2 COLLECTIONS
+
+Required conceptual collections:
+
+    analyses
+    conversations
+    messages
+    data_snapshots
+
+No SQL tables or migration scripts were created.
+
+2.3 ANALYSIS MODEL
+
+File: Backend/src/models/Analysis.js
+
+Model: Analysis
+
+Collection: analyses
+
+Schema:
+
+    analysisId
+        String
+        required
+        unique
+        index
+        trim
+
+    status
+        String
+        enum:
+            pending
+            processing
+            completed
+            partial
+            failed
+        default:
+            pending
+
+    request
+        Embedded object:
+            activity
+                String, required, trim
+            date
+                String, required
+            time
+                String, required
+
+    zones
+        Array of embedded zoneSchema
+        required
+        at least one element
+
+    overallDecision
+        Mixed
+        default null
+
+    dataQuality
+        Mixed
+        default null
+
+    agentTrace
+        Mixed
+        default null
+
+    createdAt
+        Date, timestamps
+
+    updatedAt
+        Date, timestamps
+
+Zone schema:
+
+    zoneId
+        String
+        required
+        trim
+
+    location.latitude
+        Number
+        required
+        min -90
+        max 90
+
+    location.longitude
+        Number
+        required
+        min -180
+        max 180
+
+    gis
+        Mixed
+        default null
+
+    weather
+        Mixed
+        default null
+
+    ocean
+        Mixed
+        default null
+
+    ecosystem
+        Mixed
+        default null
+
+    risk
+        Mixed
+        default null
+
+    recommendation
+        Mixed
+        default null
+
+Zone _id: disabled with {_id: false}
+
+The model is intentionally multi-zone. There is no root-level single
+latitude/longitude field in the final design.
+
+Logical relationship: one Analysis contains many zones.
+
+Zone identity: analysisId + zoneId
+
+There is no relational foreign key because MongoDB is document based.
+
+2.4 DATASNAPSHOT MODEL
+
+File: Backend/src/models/DataSnapshot.js
+
+Model: DataSnapshot
+
+Collection: data_snapshots
+
+Fields:
+
+    analysisId
+        String
+        required
+        index
+
+    zoneId
+        String
+        required
+        index
+
+    source
+        String
+        required
+
+    variable
+        String
+        required
+
+    value
+        Mixed
+        default null
+
+    unit
+        String
+        default null
+
+    validAt
+        Date
+        default null
+
+    retrievedAt
+        Date
+        default Date.now
+
+    dataType
+        String
+        default null
+
+    quality
+        String
+        default null
+
+    status
+        enum:
+            available
+            unavailable
+            error
+        default available
+
+    createdAt
+    updatedAt
+        timestamps
+
+Compound index:
+
+    { analysisId: 1, zoneId: 1 }
+
+Purpose: preserve the exact environmental information used by an
+analysis together with source/provenance fields.
+
+2.5 CONVERSATION MODEL
+
+File: Backend/src/models/Conversation.js
+
+Collection: conversations
+
+Fields:
+
+    conversationId
+        String
+        required
+        unique
+        index
+        trim
+
+    analysisId
+        String
+        required
+        index
+        trim
+
+    zoneId
+        String
+        default null
+        index
+        trim
+
+    createdAt
+    updatedAt
+        timestamps
+
+Logical relationship:
+
+    Analysis 1:N Conversation
+
+2.6 MESSAGE MODEL
+
+File: Backend/src/models/Message.js
+
+Collection: messages
+
+Fields:
+
+    conversationId
+        String
+        required
+        index
+        trim
+
+    analysisId
+        String
+        required
+        index
+        trim
+
+    zoneId
+        String
+        default null
+        index
+        trim
+
+    role
+        String
+        enum:
+            user
+            assistant
+            system
+        required
+
+    content
+        String
+        required
+        trim
+
+    status
+        String
+        enum:
+            available
+            unavailable
+            error
+        default available
+
+    metadata
+        Mixed
+        default null
+
+    createdAt
+    updatedAt
+        timestamps
+
+Compound index:
+
+    { conversationId: 1, createdAt: 1 }
+
+Logical relationship:
+
+    Conversation 1:N Message
+
+2.7 DATABASE RELATIONSHIP MAP
+
+    Analysis
+       |
+       +---- 1:N ----> Zones (embedded)
+       |
+       +---- 1:N ----> Conversations
+                           |
+                           +---- 1:N ----> Messages
+
+    Analysis
+       |
+       +---- 1:N ----> DataSnapshots
+
+There are no N:M relationships in the current model.
+
+2.8 DATABASE GAPS
+
+No migration framework. No seed data implementation completed. No
+transactions around Analysis + DataSnapshot writes. No soft-delete
+strategy. No cascade delete. No user/account collection. No session
+collection. No schema version field.
+
+Important orphan-data issue: DELETE /analysis/:analysisId currently
+removes the Analysis document only. It does not automatically delete
+conversations, messages, or snapshots.
+
+==================================================================== 3.
+COMPLETE API SPECIFICATION & ROUTE MAP
+====================================================================
+
+3.1 COMMON SUCCESS RESPONSE
+
+Utility: src/utils/response.js
+
+Function:
+
+    sendSuccess(res, data, message, statusCode)
+
+Shape:
+
+    {
+      "success": true,
+      "message": "...",
+      "data": ...
+    }
+
+3.2 COMMON ERROR RESPONSE
+
+Utility: sendError()
+
+Error middleware returns:
+
+    {
+      "success": false,
+      "message": "...",
+      "errors": null,
+      "requestId": "..."
+    }
+
+In development only, current error middleware also attaches: stack
+
+Production must not expose internal stacks.
+
+3.3 REQUEST-ID HEADER
+
+Middleware: request-id.middleware.js
+
+Input: x-request-id
+
+If absent: crypto.randomUUID()
+
+Output: X-Request-ID response header
+
+Also: req.requestId
+
+3.4 GET HEALTH
+
+Method: GET
+
+Path: /api/v1/health
+
+Controller: health.controller.js
+
+Authentication: none
+
+Response status: 200
+
+Data:
+
+    {
+      service: "orca-backend",
+      status: "running",
+      environment: config.server.nodeEnv,
+      requestId: req.requestId,
+      timestamp: new Date().toISOString()
+    }
+
+Test: [TESTED] Local health endpoint works.
+
+3.5 POST CREATE ANALYSIS
+
+Method: POST
+
+Path: /api/v1/analysis
+
+Middleware: validateZones
+
+Controller: analysis.controller.js
+
+Body:
+
+    {
+      "activity": "fishing",
+      "date": "2026-09-05",
+      "time": "06:00",
+      "zones": [
+        {
+          "zoneId": "Z1",
+          "latitude": 19.076,
+          "longitude": 72.8777
+        }
+      ]
+    }
+
+Required: activity date time zones
+
+Validation: - zones must be an array; - zones cannot be empty; - every
+zone must be an object; - zoneId required; - latitude numeric; -
+longitude numeric; - latitude -90..90; - longitude -180..180.
+
+One-zone request is valid: zones = [Z1]
+
+Response: 201
+
+Example shape:
+
+    {
+      "success": true,
+      "message": "Analysis created",
+      "data": {
+        "analysisId": "analysis_<UUID>",
+        "status": "completed|partial",
+        "zones": [...]
+      }
+    }
+
+The implementation generates: analysis_<crypto.randomUUID()>
+
+3.6 GET ANALYSIS
+
+Method: GET
+
+Path: /api/v1/analysis/:analysisId
+
+Middleware: validateAnalysisId
+
+Controller: analysis.controller.js
+
+Service: getAnalysis()
+
+Success: 200
+
+Missing: 404
+
+3.7 GET ANALYSIS STATUS
+
+Method: GET
+
+Path: /api/v1/analysis/:analysisId/status
+
+Middleware: validateAnalysisId
+
+Response data:
+
+    {
+      analysisId,
+      status
+    }
+
+Success: 200
+
+Missing: 404
+
+3.8 DELETE ANALYSIS
+
+Method: DELETE
+
+Path: /api/v1/analysis/:analysisId
+
+Middleware: validateAnalysisId
+
+Behavior: findOneAndDelete({analysisId})
+
+Success: 200
+
+Missing: 404
+
+Known issue: Related snapshots/conversations/messages are not removed.
+
+3.9 POST CHAT
+
+Method: POST
+
+Path: /api/v1/chat
+
+Body:
+
+    {
+      "conversationId": "conversation_...",
+      "analysisId": "analysis_...",
+      "zoneId": "Z1",
+      "message": "Is this area safe for fishing?"
+    }
+
+conversationId: optional when creating a new conversation.
+
+analysisId: required.
+
+message: required non-empty string.
+
+Current behavior: - create/load conversation; - save user message; -
+save placeholder assistant message; - assistant message status is
+unavailable.
+
+No fabricated AI answer is generated.
+
+3.10 GET CHAT CONVERSATION
+
+Method: GET
+
+Current implemented path: /api/v1/chat/:conversationId
+
+The team-rule recommended path is: /api/v1/conversations/:conversationId
+
+Known contract discrepancy.
+
+3.11 GET CHAT MESSAGES
+
+Method: GET
+
+Current implemented path: /api/v1/chat/:conversationId/messages
+
+Recommended architecture path:
+/api/v1/conversations/:conversationId/messages
+
+Known contract discrepancy.
+
+3.12 GET SNAPSHOTS
+
+Method: GET
+
+Path: /api/v1/data/snapshots/:analysisId
+
+Optional query: zoneId=Z1
+
+Example:
+
+    /api/v1/data/snapshots/analysis_ABC?zoneId=Z1
+
+Response:
+
+    {
+      "success": true,
+      "message": "Data snapshots retrieved",
+      "data": {
+        "analysisId": "analysis_ABC",
+        "zoneId": "Z1 or null",
+        "count": 5,
+        "snapshots": [...]
+      }
+    }
+
+Initial test before snapshot integration: success=true count=0
+snapshots=[]
+
+The endpoint itself was confirmed working.
+
+3.13 GIS DIRECT ROUTE
+
+Method: GET
+
+Path: /api/v1/gis/zone/:zoneId
+
+Query: latitude longitude
+
+Example:
+
+    /api/v1/gis/zone/Z1?latitude=19.076&longitude=72.8777
+
+The formal project rules also recommend:
+
+    POST /api/v1/gis/resolve
+    POST /api/v1/gis/batch
+
+Those exact recommended POST routes were not completed in the same
+sequence.
+
+3.14 OCEAN DIRECT ROUTES
+
+Tide: GET /api/v1/ocean/zone/:zoneId/tide
+
+PFZ: GET /api/v1/ocean/zone/:zoneId/pfz
+
+Tide query: lat lon fromDate toDate
+
+PFZ query: latitude longitude
+
+3.15 ECOSYSTEM DIRECT ROUTE
+
+Method: GET
+
+Path: /api/v1/ecosystem/zone/:zoneId
+
+Query: latitude longitude date
+
+The controller converts query values to Number and uses
+Number.isFinite().
+
+3.16 AUTH REQUIREMENTS
+
+All currently implemented routes: no real authentication
+
+auth.middleware.js: placeholder only
+
+No: JWT OAuth session cookies refresh tokens API keys password login
+
+==================================================================== 4.
+CORE BUSINESS LOGIC & SERVICES
+====================================================================
+
+4.1 ANALYSIS SERVICE — MAIN ORCHESTRATOR
+
+File: Backend/src/services/analysis.service.js
+
+Functions: createAnalysis() getAnalysis() getAnalysisStatus()
+deleteAnalysis()
+
+createAnalysis performs:
+
+    1. Validate activity/date/time.
+    2. Validate zones array.
+    3. Generate analysisId.
+    4. Format each zone.
+    5. Create Analysis Mongo document.
+    6. Set status=processing.
+    7. Process each zone.
+    8. Call GIS.
+    9. Call Ocean.
+    10. Call Ecosystem.
+    11. Call Weather.
+    12. Save snapshots.
+    13. Set final status:
+            completed if no failure
+            partial if one or more failures
+    14. Update Analysis document.
+    15. Return updated analysis.
+
+4.2 GIS STEP
+
+For each zone:
+
+    getGISData({
+      latitude,
+      longitude
+    })
+
+On success: zone.gis = result
+
+On failure: hasFailure=true zone.gis = { status: “error”, data: null,
+reason: error.message }
+
+GIS snapshot: variable = “gis_data”
+
+4.3 OCEAN STEP
+
+For each zone:
+
+    getOceanData({
+      latitude,
+      longitude,
+      fromDate: date,
+      toDate: date
+    })
+
+Result: zone.ocean = { tide: …, pfz: … }
+
+If tide or PFZ reports error: hasFailure=true
+
+Snapshots: tide_data pfz_data
+
+4.4 ECOSYSTEM STEP
+
+For each zone:
+
+    getEcosystemData({
+      latitude,
+      longitude,
+      date
+    })
+
+Success: zone.ecosystem = result
+
+Failure: zone.ecosystem = { status: “error”, data: null, reason:
+error.message }
+
+Snapshot: ecosystem_data
+
+4.5 WEATHER STEP
+
+For each zone:
+
+    getWeather({
+      latitude,
+      longitude,
+      date,
+      time
+    })
+
+Success: zone.weather = result
+
+Failure: zone.weather = { status: “error”, data: null, reason:
+error.message }
+
+Snapshot: weather_data
+
+4.6 FINAL STATUS
+
+Current final logic:
+
+    analysis.status =
+      hasFailure
+        ? "partial"
+        : "completed";
+
+This fixed an earlier bug where successful analyses stayed in
+“processing”.
+
+Schema still supports: pending processing completed partial failed
+
+The current implementation is synchronous and normally transitions:
+processing -> completed or processing -> partial
+
+4.7 PARTIAL FAILURE DESIGN
+
+Example:
+
+    GIS       available
+    Ocean     available
+    Ecosystem error
+    Weather   available
+
+Result: status = partial
+
+Successful data remains stored.
+
+The failed source gets an explicit error/unavailable representation.
+
+This is deliberate and is a core ORCA architecture requirement.
+
+4.8 GIS SERVICE
+
+File: Backend/src/services/gis.service.js
+
+Function: getGISData({latitude, longitude})
+
+Validation: latitude must be number longitude must be number latitude
+-90..90 longitude -180..180
+
+Configured base: https://orca-backend-gis.onrender.com
+
+Endpoint: /api/gis
+
+Request: GET /api/gis?latitude=…&longitude=…
+
+Uses: AbortController config.request.timeoutMs
+
+Success envelope:
+
+    {
+      status: "available",
+      data,
+      source: ".../api/gis",
+      retrievedAt: "..."
+    }
+
+Errors: 502 upstream failure 504 timeout 400 invalid coordinates
+
+[TESTED] GIS completed successfully during analysis tests.
+
+4.9 OCEAN SERVICE
+
+File: Backend/src/services/ocean.service.js
+
+Functions include separate Tide and PFZ retrieval plus: getOceanData()
+
+Tide endpoint:
+
+    https://orca-backend-tide.onrender.com/tide
+
+Parameters: lat lon fromDate toDate
+
+PFZ endpoint:
+
+    https://orca-backend-fz.onrender.com/api/pfz
+
+Parameters: latitude longitude
+
+The combined implementation uses Promise.allSettled().
+
+Why: Tide can succeed while PFZ fails, or vice versa.
+
+This preserves partial ocean data.
+
+[TESTED] Tide and PFZ were observed as available during integrated
+analysis testing.
+
+4.10 ECOSYSTEM SERVICE
+
+File: Backend/src/services/ecosystem.service.js
+
+Function: getEcosystemData({latitude, longitude, date})
+
+Base: https://orca-backend-ecosystem.onrender.com
+
+Endpoint: /api/ecosystem
+
+Query: latitude longitude date
+
+Uses: URL fetch AbortController AppError
+
+The direct ecosystem API returned fields including:
+
+    chlorophyll_mg_m3
+    phytoplankton_mmol_m3
+    dissolved_oxygen_mg_l
+    primary_production_mg_c_m3_day
+    nitrate_mmol_m3
+    phosphate_mmol_m3
+    silicate_mmol_m3
+    dissolved_iron_mmol_m3
+    ph
+    dissolved_inorganic_carbon_mmol_m3
+    total_alkalinity_mmol_m3
+    surface_co2_pa
+    optical_attenuation_m_inv
+    zooplankton_mmol_m3
+
+Provider response also had null values for some fields such as:
+suspended_matter_mg_l secchi_depth_m kd490_m_inv
+
+Provider status included: ocean_colour_status = “forecast_unavailable”
+
+The backend preserves these provider values rather than inventing
+replacements.
+
+Observed incident: An integrated analysis once received HTTP 502 from
+the ecosystem service.
+
+Later direct test: Same endpoint returned success=True with valid
+ecosystem data.
+
+Conclusion: endpoint was working later; the earlier failure was
+transient/upstream/ cold-start-like behavior rather than a confirmed
+permanent outage.
+
+4.11 WEATHER SERVICE — OPEN-METEO
+
+File: Backend/src/services/weather.service.js
+
+Provider: Open-Meteo
+
+Endpoint: https://api.open-meteo.com/v1/forecast
+
+Inputs: latitude longitude date time
+
+Hourly variables requested:
+
+    temperature_2m
+    relative_humidity_2m
+    apparent_temperature
+    precipitation_probability
+    precipitation
+    weather_code
+    pressure_msl
+    cloud_cover
+    visibility
+    wind_speed_10m
+    wind_direction_10m
+    wind_gusts_10m
+
+Units requested:
+
+    temperature_unit=celsius
+    wind_speed_unit=kn
+    precipitation_unit=mm
+
+Timezone: timezone=auto
+
+Date: start_date= end_date=
+
+Without date: forecast_days=7
+
+The service selects the requested hour by matching: YYYY-MM-DDTHH:MM
+
+Return envelope:
+
+    {
+      status: "available",
+      provider: "Open-Meteo",
+      requested: {
+        latitude,
+        longitude,
+        date,
+        time
+      },
+      selected: {
+        time,
+        temperature_2m,
+        relative_humidity_2m,
+        apparent_temperature,
+        precipitation_probability,
+        precipitation,
+        weather_code,
+        pressure_msl,
+        cloud_cover,
+        visibility,
+        wind_speed_10m,
+        wind_direction_10m,
+        wind_gusts_10m
+      },
+      data,
+      source,
+      retrievedAt
+    }
+
+[TESTED] Open-Meteo returned HTTP 200 during integrated analysis.
+
+Terminal evidence: [WEATHER] HTTP status: 200 [WEATHER] Z1 completed
+
+Important limitation: current date input is expected to be a real date
+such as 2026-09-05. The current weather implementation should not be
+assumed to support the literal string “tomorrow”.
+
+4.12 SNAPSHOT SERVICE
+
+File: Backend/src/services/snapshot.service.js
+
+Functions:
+
+    saveSnapshot({
+      analysisId,
+      zoneId,
+      source,
+      variable,
+      value,
+      unit,
+      validAt,
+      dataType,
+      quality,
+      status
+    })
+
+    saveSnapshots(snapshots=[])
+
+    getSnapshots(analysisId, zoneId=null)
+
+saveSnapshot sets: retrievedAt = new Date()
+
+getSnapshots: filters by analysisId optionally filters zoneId sorts
+retrievedAt descending
+
+4.13 SNAPSHOT VARIABLES CURRENTLY USED
+
+GIS: gis_data
+
+Ocean: tide_data pfz_data
+
+Ecosystem: ecosystem_data
+
+Weather: weather_data
+
+The current implementation often stores an entire service payload as
+value.
+
+Production-quality variable-level storage could instead create
+individual snapshot records for each variable.
+
+4.14 AI SERVICE BRIDGE
+
+File: Backend/src/services/ai.service.js
+
+Function: callAI({ analysisId, zones, request })
+
+Purpose: Node.js -> AI-Service transport bridge.
+
+Payload includes:
+
+    analysisId
+    request.activity
+    request.date
+    request.time
+
+For every zone: zoneId location.latitude location.longitude gis weather
+ocean ecosystem
+
+Configured endpoint: AI_SERVICE_URL + AI_ANALYZE_ENDPOINT
+
+Default: http://localhost:8000/api/v1/analyze
+
+Uses: fetch JSON AbortController AppError
+
+[PARTIAL] Transport code exists.
+
+[KNOWN GAP] Current implementation does not yet provide: strict AI
+response validation schema enforcement safe transient retry policy
+
+[KNOWN GAP] Current final analysis lifecycle is not yet reliably calling
+callAI() and persisting
+risk/recommendation/overallDecision/agentTrace/dataQuality.
+
+4.15 RISK AND DECISION
+
+The Analysis zone schema already reserves:
+
+    risk
+    recommendation
+
+Top-level Analysis reserves:
+
+    overallDecision
+    dataQuality
+    agentTrace
+
+Backend does not calculate these values itself.
+
+This is intentional: AI-Service must perform reasoning.
+
+No risk/confidence values are fabricated.
+
+4.16 CONVERSATION SERVICE
+
+File: Backend/src/services/conversation.service.js
+
+Functions:
+
+    sendMessage()
+    getConversation()
+    getMessages()
+
+sendMessage flow:
+
+    validate analysisId
+        ->
+    validate message
+        ->
+    load existing conversation OR create new one
+        ->
+    save user Message
+        ->
+    save assistant Message
+        ->
+    update conversation
+        ->
+    return result
+
+Current assistant placeholder:
+
+    content = "AI response is not available yet."
+    status = "unavailable"
+
+This is not a final chatbot response.
+
+[PARTIAL] Real AI chat call is not yet implemented.
+
+4.17 FINGERPRINT UTILITY
+
+File: Backend/src/utils/fingerprint.js
+
+Functions:
+
+    createFingerprint(data)
+    createAnalysisFingerprint({...})
+
+Algorithm: SHA-256
+
+Normalization: recursively sort object keys before JSON.stringify()
+
+Analysis fingerprint includes:
+
+    activity
+    date
+    time
+    zones[].zoneId
+    zones[].latitude
+    zones[].longitude
+
+Purpose: stable identifier for equivalent input structures.
+
+[PARTIAL] Not currently wired into analysis deduplication or stored on
+Analysis.
+
+4.18 UNITS UTILITY
+
+File: Backend/src/utils/units.js
+
+Functions:
+
+    celsiusToFahrenheit()
+    fahrenheitToCelsius()
+    metersToKilometers()
+    kilometersToMeters()
+    metersToNauticalMiles()
+    kilometersToNauticalMiles()
+    nauticalMilesToKilometers()
+    metersPerSecondToKnots()
+    knotsToMetersPerSecond()
+    millimetersToMeters()
+    roundValue()
+
+Invalid non-number inputs generally return null.
+
+[PARTIAL] Central conversion library exists, but not every provider
+value is routed through it.
+
+4.19 TIME UTILITY
+
+File: Backend/src/utils/time.js
+
+Functions:
+
+    nowUTC()
+    nowISO()
+    toISOString(date)
+    isValidDate(date)
+    getDateOnly(date)
+    getTimeOnly(date)
+    addMinutes(date, minutes)
+    addHours(date, hours)
+
+[PARTIAL] Created but not comprehensively wired into request
+normalization.
+
+==================================================================== 5.
+SECURITY, AUTHENTICATION & SESSION HANDLING
+====================================================================
+
+5.1 AUTHENTICATION
+
+[NOT IMPLEMENTED]
+
+auth.middleware.js is only:
+
+    req.user = null;
+    next();
+
+No: JWT OAuth session cookie refresh token password authentication API
+key authentication
+
+The middleware is an architectural placeholder.
+
+5.2 AUTHORIZATION
+
+[NOT IMPLEMENTED]
+
+No role-based permissions exist.
+
+No per-user analysis ownership enforcement exists.
+
+5.3 CORS
+
+server.js:
+
+    cors({
+      origin: config.frontend.url
+    })
+
+Default: http://localhost:5173
+
+Production should replace this with the exact deployed frontend
+origin(s).
+
+5.4 RATE LIMITING
+
+File: rate-limit.middleware.js
+
+Implementation: in-memory Map
+
+Defaults:
+
+    RATE_LIMIT_WINDOW_MS=900000
+    RATE_LIMIT_MAX_REQUESTS=100
+
+Meaning: 100 requests per 15-minute window per client key.
+
+Client key: req.ip or x-forwarded-for or “unknown”
+
+Over limit: HTTP 429
+
+Known limitation: in-memory limits do not synchronize across multiple
+instances.
+
+Production solution: distributed limiter/shared store.
+
+5.5 SECURITY HEADERS
+
+Helmet is not installed.
+
+Therefore: Content-Security-Policy HSTS X-Content-Type-Options other
+explicit security headers are not configured by the backend.
+
+[PLANNED] Add production security headers.
+
+5.6 INPUT VALIDATION
+
+Manual validation exists.
+
+Coordinate rules: latitude -90..90 longitude -180..180
+
+Zone rules: zones must be array non-empty zoneId required
+
+[KNOWN GAP] No Joi/Zod/Ajv/express-validator schema layer was added.
+
+5.7 REQUEST SIZE / SANITIZATION
+
+No explicit body-size policy beyond Express defaults was designed.
+
+No dedicated sanitization package was added.
+
+5.8 SECRET MANAGEMENT
+
+.env is intended for local secrets/config.
+
+.gitignore includes: .env .env.local .env.*.local
+
+.env.example contains safe key names/placeholders.
+
+Never commit: API keys tokens passwords private credentials private
+responses containing secrets
+
+5.9 PASSWORD HASHING
+
+Not applicable because accounts do not exist yet.
+
+No: bcrypt Argon2 password reset password salt password expiry were
+implemented.
+
+==================================================================== 6.
+ENVIRONMENT VARIABLES, CONFIGS & INTEGRATIONS
+====================================================================
+
+6.1 ENVIRONMENT VARIABLES
+
+Development configuration used:
+
+    PORT=3000
+    NODE_ENV=development
+    MONGODB_URI=mongodb://localhost:27017/orca
+    FRONTEND_URL=http://localhost:5173
+
+    AI_SERVICE_URL=http://localhost:8000
+    AI_ANALYZE_ENDPOINT=/api/v1/analyze
+
+    GIS_SERVICE_URL=https://orca-backend-gis.onrender.com
+    TIDE_API_URL=https://orca-backend-tide.onrender.com
+    PFZ_API_URL=https://orca-backend-fz.onrender.com
+    ECOSYSTEM_SERVICE_URL=https://orca-backend-ecosystem.onrender.com
+
+    WEATHER_API_URL=https://api.open-meteo.com/v1/forecast
+    OCEAN_API_URL=
+
+    REQUEST_TIMEOUT_MS=180000
+
+    RATE_LIMIT_WINDOW_MS=900000
+    RATE_LIMIT_MAX_REQUESTS=100
+
+The 180000 ms timeout was used because the Ecosystem service had
+previously taken a long time to respond.
+
+6.2 CONFIG OBJECT
+
+File: src/config/config.js
+
+Structure:
+
+    server:
+        port
+        nodeEnv
+
+    database:
+        mongodbUri
+
+    frontend:
+        url
+
+    services:
+        ai.url
+        ai.analyzeEndpoint
+        gis.url
+        ecosystem.url
+
+    externalData:
+        weatherApiUrl
+        tideApiUrl
+        pfzApiUrl
+
+    request:
+        timeoutMs
+
+    rateLimit:
+        windowMs
+        maxRequests
+
+6.3 GIS INTEGRATION
+
+Base: https://orca-backend-gis.onrender.com
+
+Endpoint: /api/gis
+
+Purpose: GIS/spatial context.
+
+Status: [TESTED] works in integrated analysis.
+
+6.4 TIDE INTEGRATION
+
+Base: https://orca-backend-tide.onrender.com
+
+Endpoint: /tide
+
+Parameters: lat lon fromDate toDate
+
+Status: [TESTED] works.
+
+6.5 PFZ INTEGRATION
+
+Base: https://orca-backend-fz.onrender.com
+
+Endpoint: /api/pfz
+
+Parameters: latitude longitude
+
+Status: [TESTED] works.
+
+6.6 ECOSYSTEM INTEGRATION
+
+Base: https://orca-backend-ecosystem.onrender.com
+
+Endpoint: /api/ecosystem
+
+Parameters: latitude longitude date
+
+Status: [TESTED] direct call succeeds. [PARTIAL] one integrated run
+returned 502.
+
+6.7 WEATHER INTEGRATION
+
+Provider: Open-Meteo
+
+Endpoint: https://api.open-meteo.com/v1/forecast
+
+Status: [TESTED] HTTP 200.
+
+6.8 AI INTEGRATION
+
+Base: AI_SERVICE_URL
+
+Default: http://localhost:8000
+
+Endpoint: AI_ANALYZE_ENDPOINT default /api/v1/analyze
+
+Status: [PARTIAL] bridge created but actual AI-Service contract and
+final end-to-end reasoning result are not yet verified.
+
+6.9 WEBHOOKS
+
+No webhook listener implemented.
+
+6.10 PAYMENTS
+
+Not applicable.
+
+6.11 FILE UPLOADS
+
+No backend upload endpoint implemented.
+
+==================================================================== 7.
+DEPLOYMENT, SCRIPTS & OPERATIONS
+====================================================================
+
+7.1 LOCAL START
+
+From Backend directory:
+
+    npm install
+    npm run dev
+
+Production-style:
+
+    npm start
+
+Testing:
+
+    npm test
+
+7.2 LOCAL SERVER
+
+Expected:
+
+    http://localhost:3000
+
+MongoDB: mongodb://localhost:27017/orca
+
+7.3 DEPLOYED ORCA SERVICE DEPENDENCIES
+
+GIS: https://orca-backend-gis.onrender.com
+
+Tide: https://orca-backend-tide.onrender.com
+
+PFZ: https://orca-backend-fz.onrender.com
+
+Ecosystem: https://orca-backend-ecosystem.onrender.com
+
+Main backend was tested locally.
+
+No Dockerfile was developed. No Procfile was developed. No complete
+CI/CD workflow was developed. No production worker/queue was developed.
+
+7.4 GIT IGNORE
+
+Implemented:
+
+    node_modules/
+    .env
+    .env.local
+    .env.*.local
+    logs/
+    *.log
+    coverage/
+    .DS_Store
+    Thumbs.db
+    .vscode/
+    .idea/
+
+7.5 GIT / SHARED REPOSITORY RULES
+
+Do not: force-push shared branches without coordination; rewrite another
+developer’s commits; move files across ownership boundaries; silently
+change shared API fields.
+
+Before integration: inspect changed files; verify ownership; verify API
+contract; verify multi-zone behavior; verify no secrets; verify health.
+
+==================================================================== 8.
+TESTING HISTORY AND OBSERVED RESULTS
+====================================================================
+
+8.1 HEALTH
+
+GET: http://localhost:3000/api/v1/health
+
+Result: [PASS]
+
+MongoDB connection was observed: MongoDB connected successfully
+
+8.2 GIS
+
+Integrated analysis: [PASS]
+
+Terminal: [GIS] Z1 started [GIS] Z1 completed
+
+8.3 OCEAN
+
+Tide: [PASS]
+
+PFZ: [PASS]
+
+Terminal: [OCEAN] Z1 started [OCEAN] Z1 completed
+
+8.4 ECOSYSTEM
+
+First integrated attempt: HTTP 502
+
+Terminal: [ECOSYSTEM] HTTP status: 502 [ECOSYSTEM] Z1 failed: Ecosystem
+API returned HTTP 502
+
+The analysis correctly became: partial
+
+Direct later test: success = True
+
+Therefore the API itself was reachable and returned valid data.
+
+8.5 WEATHER
+
+Open-Meteo: HTTP 200
+
+Terminal: [WEATHER] HTTP status: 200 [WEATHER] Z1 completed
+
+8.6 COMPLETE ANALYSIS
+
+A tested PowerShell request was:
+
+    $body = @{
+        activity = "fishing"
+        date = "2026-09-05"
+        time = "06:00"
+        zones = @(
+            @{
+                zoneId = "Z1"
+                latitude = 19.076
+                longitude = 72.8777
+            }
+        )
+    } | ConvertTo-Json -Depth 10
+
+    Invoke-RestMethod `
+      -Uri "http://localhost:3000/api/v1/analysis" `
+      -Method POST `
+      -ContentType "application/json" `
+      -Body $body
+
+One observed analysis ID: analysis_ebf6863e-4e99-4265-9d3d-1e9cb83baad8
+
+That run returned: success = True message = Analysis created status =
+partial
+
+Reason: ecosystem upstream 502 during that particular run.
+
+8.7 SNAPSHOT ENDPOINT
+
+Initial test:
+
+    GET /api/v1/data/snapshots/<analysisId>
+
+returned:
+
+    success=true
+    count=0
+    snapshots=[]
+
+This was before snapshot writes were connected.
+
+The analysis service was then modified to call saveSnapshot() for: GIS
+Tide PFZ Ecosystem Weather
+
+A final exhaustive snapshot-count verification was not conclusively
+recorded after the last code modification.
+
+8.8 MULTI-ZONE TESTING
+
+Architecture: [IMPLEMENTED]
+
+Actual demonstrated test: primarily one zone, Z1.
+
+Required future test: at least Z1 + Z2 with deliberately different
+coordinates and assertions proving that data never crosses zone IDs.
+
+==================================================================== 9.
+ERROR HANDLING
+====================================================================
+
+9.1 AppError
+
+File: src/utils/errors.js
+
+Class: AppError
+
+Fields: message statusCode details isOperational
+
+Helpers: badRequest() unauthorized() forbidden() conflict() notFound()
+internalServer()
+
+9.2 ERROR MAPPING
+
+400: malformed request / coordinates
+
+401: helper exists; authentication not implemented
+
+403: helper exists
+
+404: resource not found
+
+409: conflict
+
+429: rate limit
+
+500: internal server error
+
+502: upstream service failure
+
+504: upstream timeout
+
+9.3 UPSTREAM TIMEOUT
+
+Services use:
+
+    const controller = new AbortController();
+
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, config.request.timeoutMs);
+
+AbortError is converted to: 504
+
+9.4 UPSTREAM HTTP FAILURE
+
+Non-2xx provider responses are converted to: 502
+
+The original upstream HTTP status is retained inside error details.
+
+==================================================================== 10.
+SECURITY AND RELIABILITY AUDIT
+====================================================================
+
+10.1 GOOD CURRENT PRACTICES
+
+-   Environment-based service URLs.
+-   .env ignored.
+-   Request IDs.
+-   Coordinate validation.
+-   Standardized error middleware.
+-   Explicit unavailable/error states.
+-   Partial-failure preservation.
+-   No fabricated AI/environment values.
+-   Separate service modules.
+-   CORS restricted to configured frontend origin.
+
+10.2 PRODUCTION RISKS
+
+HIGH: no authentication no authorization AI not fully integrated
+incomplete automated testing no strict AI response validation
+
+MEDIUM: in-memory rate limiting no Helmet/security headers synchronous
+long-running analysis generic Mixed database fields incomplete
+variable-level provenance no cascade/retention policy no distributed job
+processing
+
+10.3 RELIABILITY CONCERN
+
+Ecosystem calls have shown long response times and one transient 502.
+
+Current timeout: 180 seconds
+
+This is workable for prototype testing but creates long HTTP request
+lifetimes.
+
+Potential final architecture: POST analysis -> create job -> return
+analysisId -> background processing -> status polling -> result
+retrieval
+
+==================================================================== 11.
+API / CONTRACT AUDIT
+====================================================================
+
+11.1 ANALYSIS CONTRACT
+
+The intended request is:
+
+    {
+      activity,
+      date,
+      time,
+      zones: [
+        {
+          zoneId,
+          latitude,
+          longitude
+        }
+      ]
+    }
+
+This is aligned with the multi-zone requirement.
+
+11.2 FRONTEND RESULT CONTRACT
+
+Frontend should receive stable concepts:
+
+    zone
+    weather
+    ocean
+    ecosystem
+    risk
+    decision
+    confidence
+    evidence
+    agent status
+
+Frontend should not need LangGraph internals.
+
+11.3 AI CONTRACT
+
+AI should receive normalized structured data and return structured
+reasoning.
+
+Backend owns: transport validation persistence integration
+
+AI-Service owns: reasoning
+
+11.4 CONTRACT RISKS
+
+Chat route naming differs from the recommended conversation paths.
+
+AI response schema is not frozen.
+
+AI endpoint implementation has not been fully verified.
+
+No formal api-contract.md was completed in this sequence.
+
+==================================================================== 12.
+UNFINISHED TASKS — PRIORITIZED
+====================================================================
+
+PRIORITY 1 — COMPLETE AI ANALYSIS INTEGRATION
+
+Need to connect:
+
+    analysis.service.js
+        ->
+    ai.service.js
+        ->
+    AI-Service
+
+Then persist:
+
+    zone.risk
+    zone.recommendation
+    analysis.overallDecision
+    analysis.dataQuality
+    analysis.agentTrace
+
+Do not implement reasoning in Node.
+
+PRIORITY 2 — VERIFY AI CONTRACT
+
+Obtain actual AI-Service endpoint and exact request/response JSON.
+
+Verify: endpoint HTTP method headers payload response fields error shape
+timeout behavior
+
+PRIORITY 3 — AI RESPONSE VALIDATION
+
+Add strict validation for required AI fields.
+
+Reject or mark unavailable when AI returns malformed data.
+
+Add safe transient retries only where appropriate.
+
+PRIORITY 4 — REAL CHAT AI
+
+Replace placeholder assistant response with:
+
+    conversation
+        ->
+    analysis context
+        ->
+    AI chat endpoint
+        ->
+    structured answer
+        ->
+    save assistant Message
+
+PRIORITY 5 — SNAPSHOT PROVENANCE
+
+Improve snapshots from service-level blobs toward individual variable
+records.
+
+For each important environmental variable preserve:
+
+    source
+    variable
+    value
+    unit
+    validAt
+    retrievedAt
+    dataType
+    quality
+    status
+
+PRIORITY 6 — MULTI-ZONE TEST
+
+Test:
+
+    Z1 = 19.076, 72.8777
+    Z2 = another valid coordinate
+
+Verify: Z1 data stays under Z1. Z2 data stays under Z2. snapshots
+preserve zoneId. AI payload preserves both zones.
+
+PRIORITY 7 — AUTOMATED TESTS
+
+Create Jest/Supertest coverage for:
+
+    health
+    invalid coordinate
+    missing zones
+    empty zones
+    one-zone analysis
+    multi-zone analysis
+    GIS success
+    GIS timeout
+    Ocean partial failure
+    Ecosystem failure
+    Weather success
+    Weather failure
+    snapshot persistence
+    AI success
+    AI timeout
+    malformed AI response
+    chat persistence
+    missing analysis
+    missing conversation
+    rate limiting
+
+PRIORITY 8 — SECURITY HARDENING
+
+Add: Helmet production auth authorization stronger schema validation
+request size limits production CORS distributed rate limiting
+
+PRIORITY 9 — LONG-RUNNING ANALYSIS
+
+Consider moving analysis processing into a background worker/job queue.
+
+Desired lifecycle:
+
+    POST
+      ->
+    pending
+      ->
+    processing
+      ->
+    completed / partial / failed
+
+POST should eventually be able to return quickly with analysisId.
+
+PRIORITY 10 — DELETE POLICY
+
+Decide whether deleting an analysis should: cascade delete related data;
+soft delete; preserve audit snapshots; or apply retention policies.
+
+==================================================================== 13.
+RECOMMENDED FINAL END-TO-END ARCHITECTURE
+====================================================================
+
+    USER / FRONTEND
+          |
+          | POST /api/v1/analysis
+          v
+    EXPRESS BACKEND
+          |
+          +--> request-id
+          +--> rate-limit
+          +--> validation
+          |
+          v
+    ANALYSIS CONTROLLER
+          |
+          v
+    ANALYSIS SERVICE
+          |
+          +---------------- GIS ----------------+
+          |                                      |
+          +------------- OCEAN ------------------+
+          |                |                     |
+          |              Tide                   PFZ
+          |                                      |
+          +---------- ECOSYSTEM -----------------+
+          |
+          +----------- WEATHER -----------------+
+          |                |
+          |           Open-Meteo
+          |
+          +---------- SNAPSHOTS ----------------+
+          |
+          v
+    NORMALIZED ZONE CONTEXT
+          |
+          v
+    AI SERVICE BRIDGE
+          |
+          v
+    AI-SERVICE
+          |
+          +--> Weather Agent
+          +--> Ocean Agent
+          +--> Ecosystem Agent
+          +--> Risk Agent
+          +--> Decision Agent
+          |
+          v
+    STRUCTURED AI RESULT
+          |
+          +--> zone risk
+          +--> recommendation
+          +--> overall decision
+          +--> confidence
+          +--> evidence
+          +--> agent status
+          +--> trace
+          |
+          v
+    MONGODB
+          |
+          +--> analyses
+          +--> data_snapshots
+          +--> conversations
+          +--> messages
+          |
+          v
+    FRONTEND
+          |
+          +--> map
+          +--> environmental panels
+          +--> risk
+          +--> decision
+          +--> recommendation
+          +--> confidence/evidence
+          +--> chat
+
+==================================================================== 14.
+FILE-BY-FILE STATUS MATRIX
+====================================================================
+
+Backend/package.json [IMPLEMENTED] Dependencies and scripts.
+
+Backend/.env.example [IMPLEMENTED] Safe configuration template.
+
+Backend/.gitignore [IMPLEMENTED] Secret/runtime exclusions.
+
+src/config/config.js [IMPLEMENTED] Environment configuration.
+
+src/config/database.js [IMPLEMENTED] MongoDB connection.
+
+src/utils/logger.js [IMPLEMENTED] info/warn/error/debug logging.
+
+src/utils/response.js [IMPLEMENTED] sendSuccess/sendError.
+
+src/utils/errors.js [IMPLEMENTED] AppError + status helpers.
+
+src/utils/fingerprint.js [IMPLEMENTED/PARTIAL] SHA-256 fingerprinting;
+not wired to deduplication.
+
+src/utils/units.js [IMPLEMENTED/PARTIAL] conversion functions; not
+universally integrated.
+
+src/utils/time.js [IMPLEMENTED/PARTIAL] time/date helpers; not fully
+wired.
+
+src/middleware/request-id.middleware.js [IMPLEMENTED]
+
+src/middleware/error.middleware.js [IMPLEMENTED]
+
+src/middleware/validation.middleware.js [IMPLEMENTED]
+
+src/middleware/rate-limit.middleware.js [IMPLEMENTED] Prototype
+in-memory limiter.
+
+src/middleware/auth.middleware.js [PLACEHOLDER]
+
+src/models/Analysis.js [IMPLEMENTED]
+
+src/models/Conversation.js [IMPLEMENTED]
+
+src/models/Message.js [IMPLEMENTED]
+
+src/models/DataSnapshot.js [IMPLEMENTED]
+
+src/routes/health.routes.js [IMPLEMENTED/TESTED]
+
+src/routes/analysis.routes.js [IMPLEMENTED/TESTED]
+
+src/routes/gis.routes.js [IMPLEMENTED]
+
+src/routes/ocean.routes.js [IMPLEMENTED]
+
+src/routes/ecosystem.routes.js [IMPLEMENTED]
+
+src/routes/chat.routes.js [IMPLEMENTED] Contract naming needs
+reconciliation.
+
+src/routes/data.routes.js [IMPLEMENTED/TESTED]
+
+src/controllers/health.controller.js [IMPLEMENTED/TESTED]
+
+src/controllers/analysis.controller.js [IMPLEMENTED/TESTED]
+
+src/controllers/gis.controller.js [IMPLEMENTED]
+
+src/controllers/ocean.controller.js [IMPLEMENTED]
+
+src/controllers/ecosystem.controller.js [IMPLEMENTED]
+
+src/controllers/chat.controller.js [IMPLEMENTED]
+
+src/controllers/data.controller.js [IMPLEMENTED]
+
+src/services/analysis.service.js [IMPLEMENTED/PARTIAL] Data collection
+and snapshots work; AI result persistence incomplete.
+
+src/services/gis.service.js [IMPLEMENTED/TESTED]
+
+src/services/ocean.service.js [IMPLEMENTED/TESTED]
+
+src/services/ecosystem.service.js [IMPLEMENTED/TESTED DIRECTLY]
+
+src/services/weather.service.js [IMPLEMENTED/TESTED]
+
+src/services/ai.service.js [IMPLEMENTED/PARTIAL] Bridge exists; final AI
+contract/retry/validation/integration incomplete.
+
+src/services/snapshot.service.js [IMPLEMENTED]
+
+src/services/conversation.service.js [IMPLEMENTED/PARTIAL] Persistence
+exists; real AI chat missing.
+
+src/server.js [IMPLEMENTED/TESTED]
+
+==================================================================== 15.
+EXACT CURRENT DATA COLLECTION PIPELINE
+====================================================================
+
+For a request:
+
+    activity = fishing
+    date = 2026-09-05
+    time = 06:00
+
+and:
+
+    Z1
+    latitude = 19.076
+    longitude = 72.8777
+
+the current pipeline is:
+
+    POST /api/v1/analysis
+        |
+        v
+    validateZones
+        |
+        v
+    create Analysis
+        |
+        v
+    status = processing
+        |
+        v
+    Z1
+        |
+        +--> GIS
+        |      |
+        |      +--> zone.gis
+        |      +--> gis_data snapshot
+        |
+        +--> Ocean
+        |      |
+        |      +--> Tide
+        |      +--> PFZ
+        |      +--> zone.ocean
+        |      +--> tide_data snapshot
+        |      +--> pfz_data snapshot
+        |
+        +--> Ecosystem
+        |      |
+        |      +--> zone.ecosystem
+        |      +--> ecosystem_data snapshot
+        |
+        +--> Weather
+               |
+               +--> Open-Meteo
+               +--> zone.weather
+               +--> weather_data snapshot
+        |
+        v
+    hasFailure?
+        |
+        +--> yes: partial
+        |
+        +--> no: completed
+        |
+        v
+    update MongoDB
+        |
+        v
+    return response
+
+The missing next stage is:
+
+    collected zone context
+        ->
+    AI-Service
+        ->
+    risk/decision/recommendation
+        ->
+    persist AI result
+        ->
+    final response
+
+==================================================================== 16.
+IMPORTANT DESIGN DECISIONS TO PRESERVE
+====================================================================
+
+1.  MULTI-ZONE IS NOT OPTIONAL. Always keep: zones[] zoneId location
+    per-zone service data
+
+2.  DO NOT MOVE TO ROOT-LEVEL LAT/LON. A single global coordinate model
+    would break the intended multi-zone design.
+
+3.  DO NOT MIX ZONE DATA. Never use array position as the only identity.
+
+4.  DO NOT FABRICATE DATA. Missing environmental data must remain
+    null/unavailable/error.
+
+5.  DO NOT FABRICATE RISK OR CONFIDENCE. These must come from the
+    appropriate reasoning process.
+
+6.  DO NOT PUT AI REASONING IN NODE. Backend is the
+    transport/orchestration boundary.
+
+7.  PRESERVE PROVENANCE. Keep source, timestamp, variable, unit,
+    forecast/observation, quality, and status wherever possible.
+
+8.  PRESERVE PARTIAL RESULTS. One upstream failure must not destroy
+    successful data.
+
+9.  KEEP PROVIDER-SPECIFIC ECOSYSTEM LOGIC IN ECOSYSTEM-SERVICE. Do not
+    spread Copernicus/provider-specific details through the Backend.
+
+10. KEEP ROUTES/CONTROLLERS THIN. Put business logic in services.
+
+11. KEEP server.js AS BOOTSTRAP ONLY.
+
+12. DO NOT COMMIT .env OR SECRETS.
+
+13. STABILIZE API CONTRACTS BEFORE FRONTEND/AI INTEGRATION. Do not
+    silently rename fields.
+
+==================================================================== 17.
+FINAL AUDIT CONCLUSION
+====================================================================
+
+The ORCA backend has reached a solid prototype data-orchestration stage.
+
+Confirmed working pieces: Express server MongoDB connection health
+endpoint analysis POST endpoint analysis retrieval analysis status GIS
+integration Tide integration PFZ integration Ecosystem direct
+integration Open-Meteo weather integration partial-failure handling
+DataSnapshot model snapshot API snapshot writes basic chat persistence
+standardized errors request IDs basic rate limiting configuration
+through environment variables
+
+The architecture is modular and follows the intended responsibility
+boundary: Backend orchestrates, external services retrieve/compute
+domain data, and AI-Service is intended to own reasoning.
+
+The biggest unfinished item is NOT another utility file. It is the
+actual AI contract and AI analysis integration.
+
+The next major implementation should therefore be:
+
+    1. Inspect AI-Service endpoint.
+    2. Freeze AI request/response schema.
+    3. Update ai.service.js to match exactly.
+    4. Add AI response validation.
+    5. Add safe transient retries.
+    6. Connect callAI() from analysis.service.js.
+    7. Persist risk/recommendation.
+    8. Persist overallDecision.
+    9. Persist dataQuality.
+    10. Persist agentTrace.
+    11. Complete real AI chat.
+    12. Run multi-zone tests.
+    13. Add automated Jest/Supertest coverage.
+    14. Harden authentication/security/deployment.
+
+FINAL BACKEND DEFINITION-OF-DONE STATUS
+
+API starts: PASS
+
+MongoDB works: PASS
+
+Health works: PASS
+
+Analysis API works: PASS
+
+Multi-zone architecture: PASS exhaustive two-zone test still required
+
+Stable zone IDs: PASS by design full multi-zone verification required
+
+GIS: PASS
+
+Weather: PASS
+
+Ocean: PASS
+
+Ecosystem: PASS directly intermittent upstream failure observed
+
+AI bridge: PARTIAL
+
+AI reasoning integration: NOT COMPLETE
+
+Risk/decision persistence: NOT COMPLETE
+
+Chat persistence: PASS skeleton
+
+Real AI chat: NOT COMPLETE
+
+Partial failures: PASS
+
+Snapshots: PASS implementation final post-change verification
+recommended
+
+Provenance: PARTIAL
+
+Standardized errors: PASS
+
+Automated tests: NOT COMPLETE
+
+Authentication: NOT COMPLETE
+
+Production security: NOT COMPLETE
+
+No secret commits: CONFIGURED / final Git audit still required
+
+No duplicated AI reasoning: PASS
+
+Frontend/AI contracts: NOT FINAL until AI contract is frozen
+
+END OF DOCUMENT

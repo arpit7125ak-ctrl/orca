@@ -11,6 +11,7 @@ const {
 } = require("./snapshot.service");
 
 const { badRequest, notFound } = require("../utils/errors");
+const { callAI } = require("./ai.service");
 
 
 // ======================================
@@ -710,6 +711,70 @@ const createAnalysis = async ({
     console.log(
       "========================================"
     );
+
+  }
+
+    // ======================================
+  // AI ANALYSIS
+  // ======================================
+
+  let aiResult = null;
+
+  try {
+
+    console.log(
+      `[AI] Starting reasoning for ${analysisId}`
+    );
+
+    aiResult = await callAI({
+      analysisId,
+
+      request: {
+        activity,
+        date,
+        time,
+      },
+
+      zones: analysis.zones,
+    });
+
+
+    // ======================================
+    // AI SERVICE RESPONSE
+    // ======================================
+
+    if (aiResult.status === "available") {
+
+      console.log(
+        `[AI] Reasoning response received for ${analysisId}`
+      );
+
+      console.log(
+        `[AI] Response received successfully`
+      );
+
+    } else {
+
+      hasFailure = true;
+
+      console.warn(
+        `[AI] AI Service unavailable for ${analysisId}`
+      );
+
+    }
+
+  } catch (error) {
+
+    hasFailure = true;
+
+    console.error(
+      `[AI] Reasoning failed for ${analysisId}:`,
+      error.message
+    );
+
+    // Important:
+    // Do not delete successful GIS, ocean,
+    // ecosystem, or weather data if AI fails.
 
   }
 
